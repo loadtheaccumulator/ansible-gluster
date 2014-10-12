@@ -1,0 +1,204 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2014 Jonathan Holloway <loadtheaccumulator@gmail.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+
+DOCUMENTATION = """
+---
+module: glusterquoata
+author: Jonathan Holloway
+short_description: gluster volume quota module
+description:
+  - This module handles gluster volume quota configurations.
+version_added: "0.1"
+options:
+  command:
+    required: true
+    description:
+      - peer command to run
+  volume_name:
+    required: true
+    description:
+      - The name of the volume for quota configuration
+  path:
+    required: true
+    description:
+      - The name of the path for quota configuration
+  hard_limit:
+    required: true
+    description:
+      - The value of the hard limit being set
+  soft_limit:
+    required: true
+    description:
+      - The value of the soft limit being set
+  time:
+    required: true
+    description:
+      - The value of the time or timeout option being set
+"""
+
+EXAMPLES = r"""
+
+# list quotas
+- glusterquota: command="list"
+
+# list quota for specific path
+- glusterquota: command=list path=/dir1
+
+# enable quotas on a volume
+- glusterquota: command=enable volume_name=glustervol1
+
+# disable quotas on a volume
+- glusterquota: command=disable volume_name=glustervol1
+
+# remove a quota
+- glusterquota: command=remove volume_name=glustervol1 path=/dir1
+
+# set hard limit
+- glusterquota: command=limit-usage volume_name=glustervol1 path=/dir1 hard_limit=100G
+
+# set soft limit
+- glusterquota: command=limit-usage volume_name=glustervol1 path=/dir1 hard_limit=100G soft_limit=76%
+
+# set the default soft limit
+- glusterquota: command=default-soft-limit volume_name=glustervol1 soft-limit=90%
+
+# set the soft timeout
+- glusterquota: command=soft-timeout volume_name=glustervol1 time=1min
+
+# set the hard timeout
+- glusterquota: command=hard-timeout volume_name=glustervol1 time=30s
+
+# set the alert time
+- glusterquota: command=alert-time volume_name=glustervol1 time=1d
+"""
+
+class GlusterQuota(object):
+
+    def __init__(self, module):
+        self.module = module
+        self.volume_name = self.module.params['volume_name']
+        self.path = self.module.params['path']
+        self.hard_limit = self.module.params['hard_limit']
+        self.soft_limit = self.module.params['soft_limit']
+        self.time = self.module.params['time']
+
+    def list(self):
+        command_string = "gluster volume quota %s list %s" % (self.volume_name, self.path)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def enable(self):
+        command_string =  "gluster volume quota %s enable" % self.volume_name
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def disable(self):
+        command_string =  "gluster volume quota %s disable --mode=script" % self.volume_name
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def remove(self):
+        command_string =  "gluster volume quota %s remove %s --mode=script" % (self.volume_name, self.path)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def limit_usage(self):
+        command_string = "gluster volume quota %s limit-usage %s %s %s" % (self.volume_name, self.path, self.hard_limit, self.soft_limit)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def default_soft_limit(self):
+        command_string = "gluster volume quota %s default-soft-limit %s" % (self.volume_name, self.soft_limit)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def soft_timeout(self):
+        command_string = "gluster volume quota %s soft-timeout %s" % (self.volume_name, self.time)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def hard_timeout(self):
+        command_string = "gluster volume quota %s hard-timeout %s" % (self.volume_name, self.time)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def alert_time(self):
+        command_string = "gluster volume quota %s alert-time %s" % (self.volume_name, self.time)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            command=dict(required=True),
+            volume_name=dict(required=False),
+            path=dict(required=False, default=""),
+            hard_limit=dict(required=False),
+            soft_limit=dict(required=False, default=""),
+            time=dict(required=False)
+        )
+    )
+
+    params = module.params
+    quota = GlusterQuota(module)
+
+    if (params['command'] == "list"):
+        (ret,output,serr) = quota.list()
+    elif (params['command'] == "enable"):
+        (ret,output,serr) = quota.enable()
+    elif (params['command'] == "disable"):
+        (ret,output,serr) = quota.disable()
+    elif (params['command'] == "remove"):
+        (ret,output,serr) = quota.remove()
+    elif (params['command'] == "limit-usage"):
+        (ret,output,serr) = quota.limit_usage()
+    elif (params['command'] == "default-soft-limit"):
+        (ret,output,serr) = quota.default_soft_limit()
+    elif (params['command'] == "soft-timeout"):
+        (ret,output,serr) = quota.soft_timeout()
+    elif (params['command'] == "hard-timeout"):
+        (ret,output,serr) = quota.hard_timeout()
+    elif (params['command'] == "alert-time"):
+        (ret,output,serr) = quota.alert_time()
+    else:
+        ret = 1
+        output = ""
+        serr = "No valid command provided. Nothing to do."
+
+    if ret == 0:
+        module.exit_json(msg=output)
+    else:
+        module.fail_json(msg=output + ": " + serr)
+
+# import module snippets
+from ansible.module_utils.basic import *
+main()
+

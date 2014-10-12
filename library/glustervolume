@@ -1,0 +1,238 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2014 Jonathan Holloway <loadtheaccumulator@gmail.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+
+DOCUMENTATION = """
+---
+module: glustervolume
+author: Jonathan Holloway
+short_description: gluster volume module
+description:
+  - This module handles gluster volume configurations.
+version_added: "0.1"
+options:
+  command:
+    required: true
+    description:
+      - Volume command to run (status, info, create, ...)
+  name:
+    required: false
+    description:
+      - The name of the volume
+  replica:
+    required: false
+    description:
+      - The replica value to pass to the create command
+  transport:
+    required: false
+    description:
+      - The transport type for the volume create command (tcp, rdma)
+  bricks:
+    required: false
+    description:
+      - A space-delimited list of bricks
+  option:
+    required: false
+    description:
+      - The option used for the volume set command
+  value:
+    required: false
+    description:
+      - The value used for the volume set command
+
+"""
+
+EXAMPLES = r"""
+# create a simple DISTRIBUTED volume
+- glustervolume: command=create name=glustervol1 bricks="server1.example.com:/gluster1/brick server2.example.com:/gluster1/brick"
+
+# create a simple REPLICATED volume
+- glustervolume: command=create name=glustervol1 replica=2 transport tcp bricks="server1.example.com:/gluster1/brick server2.example.com:/gluster1/brick"
+
+# start a volume
+- glustervolume: command=start name=glustervol1
+
+# stop a volume
+- glustervolume: command=stop name=glustervol1
+
+# set an option on a volume
+- glustervolume: command=set name=glustervol1 option=performance.readdir-ahead value=off
+
+# delete a volume
+- glustervolume: command=delete name=glustervol1
+
+# start heal on a volume
+- glustervolume: command=heal name=glustervol1
+- glustervolume: command=heal name=glustervol1 option=full
+
+# add bricks to a volume
+- glustervolume: command=add-brick name=glustervol1 replica=2 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=start
+
+# remove bricks from a volume (requires additional option parameter)
+- glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=start
+- glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=status
+- glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=commit
+- glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=stop
+"""
+
+class GlusterVolume(object):
+
+    def __init__(self, module):
+        self.module = module
+        self.name = module.params['name']
+        if module.params['replica']:
+            self.replica = module.params['replica']
+        else:
+            self.replica = 0
+        self.transport = module.params['transport']
+        self.bricks = module.params['bricks']
+        self.option = module.params['option']
+        self.value = module.params['value']
+
+    def info(self):
+        command_string = "gluster volume info " + self.name
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def status(self):
+        command_string = "gluster volume status " + self.name
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def create(self):
+        if self.replica > 0:
+            command_string = "gluster volume create --mode=script %s replica %s transport %s %s" % (self.name, self.replica, self.transport, self.bricks)
+        else:
+            command_string = "gluster volume create --mode=script %s transport %s %s" % (self.name, self.transport, self.bricks)
+
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def set(self):
+        command_string = "gluster volume set %s %s %s" % (self.name, self.option, self.value)
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def start(self):
+        command_string = "gluster volume start %s" % self.name
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def stop(self):
+        command_string = "gluster volume stop --mode=script %s" % self.name
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def delete(self):
+        command_string = "gluster volume delete --mode=script %s" % self.name
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def heal(self):
+        # optional: option=full
+        command_string = "gluster volume heal --mode=script %s %s" % (self.name, self.option)
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def add_brick(self):
+        if self.replica > 0:
+            command_string = "gluster volume add-brick --mode=script replica %s %s %s" % (self.replica, self.name, self.bricks)
+        else:
+            command_string = "gluster volume add-brick --mode=script %s %s" % (self.name, self.bricks)
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def remove_brick(self):
+        # TODO: make default "status" in case option is left off and errors
+        if (self.option == "start"):
+            command_string = "gluster volume remove-brick --mode=script %s %s start" % (self.name, self.bricks)
+            (ret, sout, serr) = self.module.run_command(command_string)
+        elif (self.option == "status"):
+            command_string = "gluster volume remove-brick --mode=script %s %s status" % (self.name, self.bricks)
+            (ret, sout, serr) = self.module.run_command(command_string)
+        elif (self.option == "commit"):
+            command_string = "gluster volume remove-brick --mode=script %s %s commit" % (self.name, self.bricks)
+            (ret, sout, serr) = self.module.run_command(command_string)
+        elif (self.option == "stop"):
+            command_string = "gluster volume remove-brick --mode=script %s %s stop" % (self.name, self.bricks)
+            (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            command=dict(required=True),
+            name=dict(required=False, default=""),
+            replica=dict(required=False, default=""),
+            transport=dict(required=False, default="tcp"),
+            bricks=dict(required=False, default=""),
+            option=dict(required=False),
+            value=dict(required=False)
+        )
+    )
+
+    params = module.params
+    volume = GlusterVolume(module)
+
+    if (params['command'] == "info"):
+        (ret, output, serr) = volume.info()
+    elif (params['command'] == "status"):
+        (ret, output, serr) = volume.status()
+    elif (params['command'] == "create"):
+        (ret, output, serr) = volume.create()
+    elif (params['command'] == "start"):
+        (ret, output, serr) = volume.start()
+    elif (params['command'] == "stop"):
+        (ret, output, serr) = volume.stop()
+    elif (params['command'] == "delete"):
+        (ret, output, serr) = volume.delete()
+    elif (params['command'] == "set"):
+        (ret, output, serr) = volume.set()
+    elif (params['command'] == "heal"):
+        (ret, output, serr) = volume.heal()
+    elif (params['command'] == "add-brick"):
+        (ret, output, serr) = volume.add_brick()
+    elif (params['command'] == "remove-brick"):
+        (ret, output, serr) = volume.remove_brick()
+    else:
+        ret = 1
+        sout = ""
+        serr = "No valid command provided. Nothing to do."
+
+    if ret == 0:
+        module.exit_json(msg=output)
+    else:
+        module.fail_json(msg=output + ": " + serr)
+
+# import module snippets
+from ansible.module_utils.basic import *
+main()
+

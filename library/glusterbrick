@@ -1,0 +1,281 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2014 Jonathan Holloway <loadtheaccumulator@gmail.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+import re
+
+DOCUMENTATION = """
+---
+module: glusterbrick
+author: Jonathan Holloway
+short_description: gluster brick module
+description:
+  - This module handles gluster brick configurations.
+version_added: "0.1"
+options:
+  command:
+        required: true
+        description:
+            - Brick command to run (create, destroy)
+  pvname:
+    required: false
+    description:
+      - The name of the physical device to use
+  vgname:
+    required: false
+    description:
+      - The name of the volume group
+  poolname:
+    required: false
+    description:
+      - The name of the logical volume pool
+  lvname:
+    required: false
+    description:
+      - The name of the logical volume for the brick
+  mountpoint:
+    required: false
+    description:
+      - Path to mount brick lv
+  brickname:
+    required: false
+    description:
+      - The name of the directory to create under the mountpoint
+  use_thinp:
+    required: false
+    description:
+      - Use LVM thinly-provisioned logical volumes (yes|no)
+    default: yes
+"""
+
+EXAMPLES = r"""
+# create a single brick mounted on /gluster1 with fullpath /gluster1/brick
+- glusterbrick: command=create_brick pvname=/dev/sda2 vgname=vg_gluster1 poolname=lv_pool1 lvname=lv_brick1 mountpoint=/gluster1 brickname=brick"
+
+# destroy a brick and everything under it back to the device level (pv, vg, lv pool, lv, and mount/fstab)
+- glusterbrick: command=destroy_brick pvname=/dev/sda2 vgname=vg_gluster1 poolname=lv_pool1 lvname=lv_brick1 mountpoint=/gluster1 brickname=brick"
+"""
+
+class GlusterBrick(object):
+
+    def __init__(self, module):
+        self.module = module
+        self.pvname = module.params['pvname']
+        self.vgname = module.params['vgname']
+        self.poolname = module.params['poolname']
+        self.lvname = module.params['lvname']
+        self.fslabel = module.params['fslabel']
+        self.mountpoint = module.params['mountpoint']
+        self.brickname = module.params['brickname']
+        self.use_thinp = module.params['use_thinp']
+
+        if self.use_thinp == None:
+            self.use_thinp = "yes"
+
+        self.stripe_size = "256k"
+        self.stripe_elements = 10
+        self.data_alignment = "2560k"        # stripe_size * stripe_elements (see Admin Guide)
+
+        self.chunksize = "256k"
+        self.lvsize = "100%FREE"
+
+        self.inode_size = 512
+        self.fs_block_size = 8192
+
+
+    def createPV(self, pvname):
+        # TODO: add tests for existing objects (device, pv, etc)
+        # TODO: add logic for tuning option(s) per Admin Guide
+        pv_command = "pvcreate --dataalignment %s %s" % (self.data_alignment, pvname)
+        (ret, sout, serr) = self.module.run_command(pv_command)
+
+        return
+
+    def createVG(self, vgname, pvname):
+        vg_command = "vgcreate %s %s" % (vgname, pvname)
+        (ret, sout, serr) = self.module.run_command(vg_command)
+
+        return ret
+
+    def createLV(self, lvname, poolname, vgname, lvsize, chunksize, use_thinp):
+
+        if lvsize.find("%FREE"):
+            lvsize_string = "-l " + lvsize
+        else:
+            lvsize_string = "-L " + lvsize
+
+        if use_thinp == "yes":
+        # THINP
+            # The pool metadata size recommendation is >= ~0.5% and max is 16GiB.
+            (ret, vgsize, serr) = self.module.run_command("vgs --noheading --units M  -o vg_size %s" % vgname)
+            vgsize = re.sub('[M]', '', vgsize).strip()
+            vgsize_gb = int(float(vgsize)) / 1024
+            metadatasize = vgsize_gb * 5    # roughly 0.5%
+            if metadatasize > 16384:
+                metadatasize = 16384
+
+            # create the pool lv
+            pool_command = "lvcreate %s -c %s --poolmetadatasize %d -T /dev/%s/%s" % (lvsize_string, chunksize, metadatasize, vgname, poolname)
+            (ret, sout, serr) = self.module.run_command(pool_command)
+
+            (ret, virtualsize, serr) = self.module.run_command ("lvs --noheading --units M -o lv_size /dev/%s/%s" % (vgname, poolname))
+            virtualsize = virtualsize.strip()
+            lv_command = "lvcreate -V %s -T /dev/%s/%s -n %s" % (virtualsize, vgname, poolname, lvname)
+            (ret, sout, serr) = self.module.run_command(lv_command)
+        else:
+        # THICKP
+            lv_command = "lvcreate %s -n %s %s" % (lvsize_string, lvname, vgname)
+            (ret, sout, serr) = self.module.run_command(lv_command)
+
+        return ret
+
+    def createXFS(self, device, inode_size, fs_block_size, stripe_size, stripe_elements, fslabel):
+        fs_command = "mkfs.xfs -i size=%s -n size=%s -d su=%s,sw=%s -L %s %s" \
+                                % (inode_size, fs_block_size, stripe_size, stripe_elements, fslabel, device)
+        (ret, sout, serr) = self.module.run_command(fs_command)
+
+        return ret
+
+    def createMountpoint(self, mountpoint):
+        (ret,sout,serr) = self.module.run_command("mkdir -p %s" % mountpoint)
+
+        return ret
+
+    def createFstabEntry(self, device, mountpoint):
+        fstab_entry_exists = False
+        for line in open("/etc/fstab"):
+            # TODO: make this whole word to avoid rhs1 rhs11 trap (and add lvname for good measure)
+            if re.search(device, line):
+                fstab_entry_exists = True
+
+        if not fstab_entry_exists:
+            mount_string = "%s   %s   xfs    inode64,noatime,nodiratime 1 2\n" % (device, mountpoint)
+            with open("/etc/fstab", "a") as fstabfile:
+                fstabfile.write (mount_string)
+
+        return
+
+    def mountFS(self, mountpoint):
+        if not os.path.ismount (mountpoint):
+            (ret, sout, serr) = self.module.run_command("mount %s" % mountpoint)
+            if ret != 0:
+                self.module.fail_json (msg=serr)
+
+        return
+
+    def createBrickDir(self, mountpoint, brickname):
+        if os.path.ismount(mountpoint) and not os.path.exists("%s/%s" % (mountpoint, brickname)):
+            (ret, sout, serr) = self.module.run_command("mkdir -p %s/%s" % (mountpoint, brickname))
+
+        return
+
+    # create a single brick with user-supplied values/defaults
+    def createBrick(self):
+
+        # only creating one lv -> pool -> vg -> pv per Admin Guide recommendations
+        # create pv
+        self.createPV(self.pvname)
+
+        # create vg
+        self.createVG(self.vgname, self.pvname)
+
+        # create lv
+        self.createLV(self.lvname, self.poolname, self.vgname, self.lvsize, self.chunksize, self.use_thinp)
+
+        # create xfs filesystem
+        device = "/dev/mapper/%s-%s" % (self.vgname, self.lvname)
+        self.createXFS(device, self.inode_size, self.fs_block_size, self.stripe_size, self.stripe_elements, self.fslabel)
+
+        #create mountpoint
+        self.createMountpoint(self.mountpoint)
+
+        # add to fstab
+        device = "/dev/mapper/%s-%s" % (self.vgname, self.lvname)
+        self.createFstabEntry(device, self.mountpoint)
+
+        # mount it
+        self.mountFS(self.mountpoint)
+
+        # create brickdir
+        # TODO: make configurable to use mountpoint or dir under mountpoint
+        self.createBrickDir(self.mountpoint, self.brickname)
+
+        # FIXME: make return contents meaningful
+        return 0, "created", ""
+
+    # DANGER! DANGER!
+    def destroyBrick(self):
+        searchstring = self.vgname + "-" + self.lvname
+        (ret, sout, serr) = self.module.run_command("sed -i '/" + searchstring + "/d' /etc/fstab")
+
+        # additional brick cleanup before unmounting
+        (ret, sout, serr) = self.module.run_command("setfattr -x trusted.glusterfs.volume-id %s/%s" % (self.mountpoint, self.brickname))
+        (ret, sout, serr) = self.module.run_command("setfattr -x trusted.gfid %s/%s" % (self.mountpoint, self.brickname))
+        (ret, sout, serr) = self.module.run_command("setfattr -x trusted.glusterfs.dht %s/%s" % (self.mountpoint, self.brickname))
+        (ret, sout, serr) = self.module.run_command("rm -rf %s/%s/.glusterfs" % (self.mountpoint, self.brickname))
+
+        (ret, sout, serr) = self.module.run_command("umount %s" % self.mountpoint)
+        if self.use_thinp == "yes":
+            (ret, sout, serr) = self.module.run_command("lvremove -fy  %s/%s" % (self.vgname, self.poolname))
+        else:
+            (ret, sout, serr) = self.module.run_command("lvremove -fy  %s/%s" % (self.vgname, self.lvname))
+        (ret, sout, serr) = self.module.run_command("vgremove -fy  %s" % self.vgname)
+        (ret, sout, serr) = self.module.run_command("pvremove -fy  %s" % self.pvname)
+
+        # FIXME: make return contents meaningful
+        return ret,sout,serr
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            command=dict(required=True),
+            pvname=dict(required=False),
+            vgname=dict(required=False),
+            poolname=dict(required=False),
+            lvname=dict(required=False),
+            fslabel=dict(required=False),
+            mountpoint=dict(required=False),
+            brickname=dict(required=False),
+            use_thinp=dict(required=False)
+        )
+    )
+
+    params = module.params
+    brick = GlusterBrick(module)
+
+    output=""
+    if (params['command'] == "create_brick"):
+        (ret,output,serr) = brick.createBrick()
+    elif (params['command'] == "destroy_brick"):
+        (ret,output,serr) = brick.destroyBrick()
+    else:
+        ret = 1
+        output = ""
+        serr = "No valid command provided. Nothing to do."
+
+    if ret == 0:
+        module.exit_json(msg=output)
+    else:
+        module.fail_json(msg=output + ": " + serr)
+
+# import module snippets
+from ansible.module_utils.basic import *
+main()
+

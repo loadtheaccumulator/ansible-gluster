@@ -1,0 +1,117 @@
+---
+# DESTROYS A GEOREP CASCADE CLUSTER - no takebacks (use with caution!!!)
+
+- hosts: IC_MASTERNODE
+  remote_user: root
+  vars:
+    master_volume_name: intergeovol
+    slave_host: "{{ groups.SC_MASTERNODE.0 }}"
+    slave_volume_name: slavegeovol
+
+  tasks:
+  - name: stop the geo-rep
+    glustergeorep: command=stop master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+  - name: delete the geo-rep
+    glustergeorep: command=delete master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+
+- hosts: MC_MASTERNODE
+  remote_user: root
+  vars:
+    master_volume_name: mastergeovol
+    slave_host: "{{ groups.IC_MASTERNODE.0 }}"
+    slave_volume_name: intergeovol
+    
+  tasks:
+  - name: stop the geo-rep
+    glustergeorep: command=stop master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+  - name: delete the geo-rep
+    glustergeorep: command=delete master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+
+- hosts: MC_MASTERNODE
+  remote_user: root
+
+  tasks:
+  - name: stop volumes
+    glustervolume: command=stop name=mastergeovol
+    ignore_errors: yes
+
+  - name: delete volumes
+    glustervolume: command=delete name=mastergeovol
+    ignore_errors: yes
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['MC_PEERS']
+    ignore_errors: yes
+
+
+- hosts: IC_MASTERNODE
+  remote_user: root
+
+  tasks:
+  - name: stop volumes
+    glustervolume: command=stop name=intergeovol
+    ignore_errors: yes
+
+  - name: delete volumes
+    glustervolume: command=delete name=intergeovol
+    ignore_errors: yes
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['IC_PEERS']
+    ignore_errors: yes
+
+
+- hosts: SC_MASTERNODE
+  remote_user: root
+
+  tasks:
+  - name: stop volumes
+    glustervolume: command=stop name=slavegeovol
+    ignore_errors: yes
+
+  - name: delete volumes
+    glustervolume: command=delete name=slavegeovol
+    ignore_errors: yes
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['SC_PEERS']
+    ignore_errors: yes
+
+
+- hosts: NODES
+  remote_user: root
+
+  vars:
+    # replace these devices with devices specific to your systems
+    pvnames:
+    - /dev/sdb1
+    - /dev/sdc1
+    - /dev/sdd1
+    - /dev/sde1
+    vgname_prefix: vg_gluster
+    poolname_prefix: lv_pool
+    lvname_prefix: lv_brick
+    fslabel_prefix: brick
+    mountpoint_prefix: "/gluster"
+    brickname: brick
+
+  tasks:
+  # loop through pvnames list and destroy individual bricks with incremental names based on the _prefix vars
+  - name: destroy bricks
+    glusterbrick: command=destroy_brick pvname={{ item.1 }} vgname={{ vgname_prefix }}{{ item.0 + 1 }} poolname={{ poolname_prefix }}{{ item.0 + 1 }} lvname={{ lvname_prefix }}{{ item.0 + 1 }} fslabel={{ fslabel_prefix }}{{ item.0 + 1 }} mountpoint={{ mountpoint_prefix }}{{ item.0 + 1 }} brickname={{ brickname }}
+    with_indexed_items: pvnames
+    ignore_errors: yes
+    tags:
+      - destroy_bricks
+

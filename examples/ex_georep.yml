@@ -1,0 +1,107 @@
+---
+# EXAMPLE: Setup and start geo-replication
+
+# CREATE BRICKS ON SERVERS
+- hosts: NODES
+  remote_user: root
+  vars:
+    # replace these devices with devices specific to your systems
+    pvnames:
+    - /dev/sdb1
+    - /dev/sdc1
+    - /dev/sdd1
+    - /dev/sde1
+    vgname_prefix: vg_gluster
+    poolname_prefix: lv_pool
+    lvname_prefix: lv_brick
+    fslabel_prefix: brick
+    mountpoint_prefix: "/gluster"
+    brickname: brick
+
+  tasks:
+  # loop through pvnames list and create individual bricks with incremental names based on the _prefix vars above
+  - name: create bricks
+    glusterbrick: command=create_brick pvname={{ item.1 }} vgname={{ vgname_prefix }}{{ item.0 + 1 }} poolname={{ poolname_prefix }}{{ item.0 + 1 }} lvname={{ lvname_prefix }}{{ item.0 + 1 }} fslabel={{ fslabel_prefix }}{{ item.0 + 1 }} mountpoint={{ mountpoint_prefix }}{{ item.0 + 1 }} brickname={{ brickname }}
+    with_indexed_items: pvnames
+
+- hosts: MC_MASTERNODE
+  remote_user: root
+  vars:
+    volumename: mastervol
+    replica: 2
+    bricks:
+    - "{{ groups.MC_MASTERNODE.0 }}:/gluster1/brick"
+    - "{{ groups.MC_PEERS.0 }}:/gluster1/brick"
+    - "{{ groups.MC_MASTERNODE.0 }}:/gluster2/brick"
+    - "{{ groups.MC_PEERS.0 }}:/gluster2/brick"
+    - "{{ groups.MC_MASTERNODE.0 }}:/gluster3/brick"
+    - "{{ groups.MC_PEERS.0 }}:/gluster3/brick"
+    - "{{ groups.MC_MASTERNODE.0 }}:/gluster4/brick"
+    - "{{ groups.MC_PEERS.0 }}:/gluster4/brick"
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  groups['MC_PEERS']
+
+  - name: create a volume
+    glustervolume: command=create name={{ volumename }} replica={{ replica }} bricks="{{ bricks|join(' ') }}"
+    
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    
+  - name: set an option
+    glustervolume: command=set name={{ volumename }} option=performance.readdir-ahead value=off
+
+- hosts: SC_MASTERNODE
+  remote_user: root
+  vars:
+    volumename: slavevol
+    replica: 2
+    bricks:
+    - "{{ groups.SC_MASTERNODE.0 }}:/gluster1/brick"
+    - "{{ groups.SC_PEERS.0 }}:/gluster1/brick"
+    - "{{ groups.SC_MASTERNODE.0 }}:/gluster2/brick"
+    - "{{ groups.SC_PEERS.0 }}:/gluster2/brick"
+    - "{{ groups.SC_MASTERNODE.0 }}:/gluster3/brick"
+    - "{{ groups.SC_PEERS.0 }}:/gluster3/brick"
+    - "{{ groups.SC_MASTERNODE.0 }}:/gluster4/brick"
+    - "{{ groups.SC_PEERS.0 }}:/gluster4/brick"
+    
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  groups['SC_PEERS']
+
+  - name: create a volume
+    glustervolume: command=create name={{ volumename }} replica={{ replica }} bricks="{{ bricks|join(' ') }}"
+    
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    
+  - name: set an option
+    glustervolume: command=set name={{ volumename }} option=performance.readdir-ahead value=off
+
+- hosts: MC_MASTERNODE
+  remote_user: root
+  vars:
+    master_volume_name: mastervol
+    slave_host: "{{ groups.SC_MASTERNODE.0 }}"
+    slave_volume_name: slavevol
+    
+  tasks:
+  - name: create the geo-rep
+    glustergeorep: command=create master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      georep
+
+  - name: start the geo-rep
+    glustergeorep: command=start master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      georep
+
+  - name: geo-rep status
+    glustergeorep: command=status master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      georep
+

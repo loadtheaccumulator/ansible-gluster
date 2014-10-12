@@ -1,0 +1,114 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2014 Jonathan Holloway <loadtheaccumulator@gmail.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+
+DOCUMENTATION = """
+---
+module: glusterpeer
+author: Jonathan Holloway
+short_description: gluster peer module
+description:
+  - This module handles gluster peer configurations.
+version_added: "0.1"
+options:
+  command:
+    required: true
+    description:
+      - peer command to run
+  name:
+    required: true
+    description:
+      - The name of the peer
+    required: false
+"""
+
+EXAMPLES = r"""
+# probe a peer
+- glusterpeer: command=probe name=server1.example.com
+
+# detach a peer
+- glusterpeer: command=detach name=server1.example.com
+
+# return status of peers
+- glusterpeer: command=status
+"""
+
+class GlusterPeer(object):
+
+    def __init__(self, module):
+        self.module = module
+        self.name = module.params['name']
+
+    def status(self):
+        command_string = "gluster peer status"
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def probe (self):
+        command_string = "gluster peer probe %s" % self.name
+        (ret, sout, serr) = self.module.run_command (command_string)
+        
+        return ret,sout,serr
+
+    def detach (self):
+        command_string = "gluster peer detach %s " % self.name
+        (ret, sout, serr) = self.module.run_command (command_string)
+        
+        return ret,sout,serr
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            command=dict(required=True),
+            name=dict(required=False),
+        )
+    )
+
+    params = module.params
+    peer = GlusterPeer(module)
+
+    if (params['command'] == "status"):
+        (ret,output,serr) = peer.status()
+    elif (params['command'] == "probe"):
+        if not params['name']:
+            module.fail_json(msg="Missing name parameter.")
+
+        (ret,output,serr) = peer.probe()
+    elif (params['command'] == "detach"):
+        if not params['name']:
+            module.fail_json(msg="Missing name parameter.")
+
+        (ret,output,serr) = peer.detach()
+    else:
+        ret = 1
+        output = ""
+        serr = "No valid command provided. Nothing to do."
+
+    if ret == 0:
+        module.exit_json(msg=output)
+    else:
+        module.fail_json(msg=output + ": " + serr)
+
+# import module snippets
+from ansible.module_utils.basic import *
+main()
+

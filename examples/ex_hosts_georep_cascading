@@ -1,0 +1,36 @@
+# This is an example ansible 'hosts' file.
+#
+# It can be used with playbooks:
+#   ex_georep_cascading.yml
+#   ex_georep_cascading_destroy.yml
+
+[MC_MASTERNODE]
+server1.example.com
+
+[MC_PEERS]
+server2.example.com
+
+[IC_MASTERNODE]
+server3.example.com
+
+[IC_PEERS]
+server4.example.com
+
+[SC_MASTERNODE]
+server5.example.com
+
+[SC_PEERS]
+server6.example.com
+
+[NODES:children]
+MC_MASTERNODE
+MC_PEERS
+IC_MASTERNODE
+IC_PEERS
+SC_MASTERNODE
+SC_PEERS
+
+[CLIENTS]
+server7.example.com
+server8.example.com
+

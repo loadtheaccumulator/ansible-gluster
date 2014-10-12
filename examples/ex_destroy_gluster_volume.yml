@@ -1,0 +1,52 @@
+---
+# DESTROYS A CLUSTER - no takebacks (use with caution!!!)
+
+- hosts: MASTERNODE
+  remote_user: root
+
+  tasks:
+  - name: stop volume
+    glustervolume: command=stop name=glustervol1
+    ignore_errors: yes
+    tags:
+      - stop_volume
+
+  - name: delete volume
+    glustervolume: command=delete name=glustervol1
+    ignore_errors: yes
+    tags:
+      - delete_volume
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['PEERS']
+    ignore_errors: yes
+    tags:
+      - detach_peers
+
+
+- hosts: NODES
+  remote_user: root
+  vars:
+    # replace these devices with devices specific to your systems
+    pvnames:
+    - /dev/sdb1
+    - /dev/sdc1
+    - /dev/sdd1
+    - /dev/sde1
+    vgname_prefix: vg_gluster
+    poolname_prefix: lv_pool
+    lvname_prefix: lv_brick
+    fslabel_prefix: brick
+    mountpoint_prefix: "/gluster"
+    brickname: brick
+
+  tasks:
+    # loop through pvnames list and destroy individual bricks with incremental names based on the _prefix vars
+  - name: destroy bricks
+    glusterbrick: command=destroy_brick pvname={{ item.1 }} vgname={{ vgname_prefix }}{{ item.0 + 1 }} poolname={{ poolname_prefix }}{{ item.0 + 1 }} lvname={{ lvname_prefix }}{{ item.0 + 1 }} fslabel={{ fslabel_prefix }}{{ item.0 + 1 }} mountpoint={{ mountpoint_prefix }}{{ item.0 + 1 }} brickname={{ brickname }}
+    with_indexed_items: pvnames
+    ignore_errors: yes
+    tags:
+      - destroy_bricks
+

@@ -1,0 +1,28 @@
+# This is an example ansible 'hosts' file.
+#
+# It can be used with playbooks:
+#   ex_georep.yml
+#   ex_georep_destroy.yml
+
+[MC_MASTERNODE]
+server1.example.com
+
+[MC_PEERS]
+server2.example.com
+
+[SC_MASTERNODE]
+server3.example.com
+
+[SC_PEERS]
+server4.example.com
+
+[NODES:children]
+MC_MASTERNODE
+MC_PEERS
+SC_MASTERNODE
+SC_PEERS
+
+[CLIENTS]
+server5.example.com
+server6.example.com
+

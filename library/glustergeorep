@@ -1,0 +1,180 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2014 Jonathan Holloway <loadtheaccumulator@gmail.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+
+DOCUMENTATION = """
+---
+module: glustergeorep
+author: Jonathan Holloway
+short_description: gluster volume geo-replication module
+description:
+  - This module handles gluster volume geo-replication configurations.
+version_added: "0.1"
+options:
+  command:
+    required: true
+    description:
+      - The geo-replication command to run
+  master_volume_name:
+    required: false
+    description:
+      - The name of the master volume
+  slave_host:
+    required: false
+    description:
+      - The hostname of the slave host
+  slave_volume_name:
+    required: false
+    description:
+      - The name of the slave volume
+  option:
+    required: false
+    description:
+      - The option for the volume geo-replication config command
+  value:
+    required: false
+    description:
+      - The value of the option for the volume geo-replication config command
+"""
+
+EXAMPLES = r"""
+# setup geo-replication
+- glustergeorep: command=create master_volume_name=mastervol1 slave_host=server3.example.com slave_volume_name=slavevol1
+
+# start and stop geo-replication
+- glustergeorep: command=start master_volume_name=mastervol1 slave_host=server3.example.com slave_volume_name=slavevol1
+- glustergeorep: command=stop master_volume_name=mastervol1 slave_host=server3.example.com slave_volume_name=slavevol1
+
+# pause and resume geo-replication
+- glustergeorep: command=pause master_volume_name=mastervol1 slave_host=server3.example.com slave_volume_name=slavevol1
+- glustergeorep: command=resume master_volume_name=mastervol1 slave_host=server3.example.com slave_volume_name=slavevol1
+
+# delete geo-replication
+- glustergeorep: command=delete master_volume_name=mastervol1 slave_host=server3.example.com slave_volume_name=slavevol1
+
+# configure geo-replication options
+- glustergeorep: command=config master_volume_name=mastervol1 slave_host=server3.example.com slave_volume_name=slavevol1 option=log-file value=/tmp/logfile
+"""
+
+class GlusterGeoRep(object):
+
+    def __init__(self, module):
+        self.module = module
+        self.master_volume_name = self.module.params['master_volume_name']
+        self.slave_host = self.module.params['slave_host']
+        self.slave_volume_name = self.module.params['slave_volume_name']
+        self.option = self.module.params['option']
+        self.value = self.module.params['value']
+
+    def status(self):
+        command_string = "gluster volume geo-replication %s %s::%s status" % (self.master_volume_name, self.slave_host, self.slave_volume_name)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def create(self):
+        (ret, sout, serr) = self.module.run_command ("gluster system:: execute gsec_create")
+        geo_command =  "gluster volume geo-replication %s %s::%s create push-pem" % (self.master_volume_name, self.slave_host, self.slave_volume_name)
+        (ret, sout, serr) = self.module.run_command (geo_command)
+
+        return ret,sout,serr
+
+    def start(self):
+        geo_command = "gluster volume geo-replication %s %s::%s start" % (self.master_volume_name, self.slave_host, self.slave_volume_name)
+        (ret, sout, serr) = self.module.run_command (geo_command)
+
+        return ret,sout,serr
+
+    def stop(self):
+        geo_command = "gluster volume geo-replication %s %s::%s stop" % (self.master_volume_name, self.slave_host, self.slave_volume_name)
+        (ret, sout, serr) = self.module.run_command (geo_command)
+
+        return ret,sout,serr
+
+    def pause(self):
+        geo_command = "gluster volume geo-replication %s %s::%s pause" % (self.master_volume_name, self.slave_host, self.slave_volume_name)
+        (ret, sout, serr) = self.module.run_command (geo_command)
+
+        return ret,sout,serr
+
+    def resume(self):
+        geo_command = "gluster volume geo-replication %s %s::%s resume" % (self.master_volume_name, self.slave_host, self.slave_volume_name)
+        (ret, sout, serr) = self.module.run_command (geo_command)
+
+        return ret,sout,serr
+
+    def delete(self):
+        geo_command = "gluster volume geo-replication %s %s::%s delete" % (self.master_volume_name, self.slave_host, self.slave_volume_name)
+        (ret, sout, serr) = self.module.run_command (geo_command)
+
+        return ret,sout,serr
+
+    def config(self):
+        geo_command = "gluster volume geo-replication %s %s::%s config %s %s" % (self.master_volume_name, self.slave_host, self.slave_volume_name, self.option, self.value)
+        (ret, sout, serr) = self.module.run_command (geo_command)
+
+        return ret,sout,serr
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            command=dict(required=True),
+            master_volume_name=dict(required=False),
+            slave_host=dict(required=False),
+            slave_volume_name=dict(required=False),
+            option=dict(required=False),
+            value=dict(required=False)
+        )
+    )
+
+    params = module.params
+    georep = GlusterGeoRep(module)
+
+    if (params['command'] == "status"):
+        (ret,output,serr) = georep.status()
+    elif (params['command'] == "create"):
+        (ret,output,serr) = georep.create()
+    elif (params['command'] == "start"):
+        (ret,output,serr) = georep.start()
+    elif (params['command'] == "stop"):
+        (ret,output,serr) = georep.stop()
+    elif (params['command'] == "pause"):
+        (ret,output,serr) = georep.pause()
+    elif (params['command'] == "resume"):
+        (ret,output,serr) = georep.resume()
+    elif (params['command'] == "delete"):
+        (ret,output,serr) = georep.delete()
+    elif (params['command'] == "config"):
+        (ret,output,serr) = georep.config()
+    else:
+        ret = 1
+        output = ""
+        serr = "No valid command provided. Nothing to do."
+
+    if ret == 0:
+        module.exit_json(msg=output)
+    else:
+        module.fail_json(msg=output + ": " + serr)
+
+# import module snippets
+from ansible.module_utils.basic import *
+main()
+
