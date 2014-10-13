@@ -46,7 +46,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
     ```
     pvnames:
-      - /dev/sdb1
+      - /dev/replaceme1
     ```
 
     ... with ...

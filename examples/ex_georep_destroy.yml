@@ -56,10 +56,10 @@
   vars:
     # replace these devices with devices specific to your systems
     pvnames:
-    - /dev/sdb1
-    - /dev/sdc1
-    - /dev/sdd1
-    - /dev/sde1
+    - /dev/replaceme1
+    - /dev/replaceme2
+    - /dev/replaceme3
+    - /dev/replaceme4
     vgname_prefix: vg_gluster
     poolname_prefix: lv_pool
     lvname_prefix: lv_brick
