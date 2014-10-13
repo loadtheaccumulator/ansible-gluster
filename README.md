@@ -48,10 +48,10 @@ e.g., to use an unused partition /dev/sda6 on the root disk of your servers, in 
 
 5. Take an example playbook for a spin.
 
-    # cd examples
-    # ansible-playbook -i ex_hosts_distrep -v ex_replicated_volume.yml
+    cd examples
+    ansible-playbook -i ex_hosts_distrep -v ex_replicated_volume.yml
 
 6. Login to the server listed under [MASTERNODE] and check the volume.
 
-    # gluster volume info
+    gluster volume info
 
