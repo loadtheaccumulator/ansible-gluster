@@ -68,7 +68,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
 5. Take an example playbook for a spin.
 
-    ````
+    ```
     $ cd examples
     $ ansible-playbook -i ex_hosts_distrep -v ex_replicated_volume.yml
     ```
@@ -76,5 +76,5 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 6. Login to the server listed under [MASTERNODE] and check the volume.
 
     ```
-    gluster volume info
+    # gluster volume info
     ```
