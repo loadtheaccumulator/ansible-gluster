@@ -30,7 +30,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
 3. Edit the example host files to specify the hostnames of your servers.
 
-      e.g., to use hosts myhost1 and myhost2, in the ex_hosts_distrep file replace...
+      e.g., in the ex_hosts_distrep file replace server1.example.com and server2.example.com with the hostnames of two of your servers...
 
     ```
     [MASTERNODE]
@@ -38,16 +38,6 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
     [PEERS]
     server2.example.com
-    ```
-
-    ... with ...
-
-    ```
-    [MASTERNODE]
-    myhost1.mydomain.com
-
-    [PEERS]
-    myhost2.mydomain.com
     ```
 
 4. Edit the example playbooks to specify the devices to be used for bricks.
