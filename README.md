@@ -23,46 +23,58 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 1. On your ansible system, git clone the ansible-gluster repository or download and unzip.
 
 2. To run the examples, you will need to add the path to the ansible-gluster directory to the Ansible library path.
+
+    ```
      $ export ANSIBLE_LIBRARY=/path/to/ansible-gluster:/usr/share/ansible
+    ```
 
 3. Edit the example host files to specify the hostnames of your servers.
 
       e.g., to use hosts myhost1 and myhost2, in the ex_hosts_distrep file replace...
 
+    ```
     [MASTERNODE]
     server1.example.com
 
     [PEERS]
     server2.example.com
+    ```
 
-... with ...
+    ... with ...
 
+    ```
     [MASTERNODE]
     myhost1.mydomain.com
 
     [PEERS]
     myhost2.mydomain.com
+    ```
 
 4. Edit the example playbooks to specify the devices to be used for bricks.
 
-e.g., to use an unused partition /dev/sda6 on the root disk of your servers, in the ex_replicated_volume.yml file replace...
+    e.g., to use an unused partition /dev/sda6 on the root disk of your servers, in the ex_replicated_volume.yml file replace...
 
+    ```
     pvnames:
       - /dev/sdb1
+    ```
 
-... with ...
+    ... with ...
 
+    ```
     pvnames:
       - /dev/sda6
-
+    ```
 
 5. Take an example playbook for a spin.
 
-    cd examples
-    ansible-playbook -i ex_hosts_distrep -v ex_replicated_volume.yml
-
+    ````
+    $ cd examples
+    $ ansible-playbook -i ex_hosts_distrep -v ex_replicated_volume.yml
+    ```
 
 6. Login to the server listed under [MASTERNODE] and check the volume.
 
+    ```
     gluster volume info
-
+    ```
