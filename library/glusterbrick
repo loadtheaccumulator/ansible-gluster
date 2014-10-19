@@ -30,9 +30,9 @@ description:
 version_added: "0.1"
 options:
   command:
-        required: true
-        description:
-            - Brick command to run (create, destroy)
+    required: true
+    description:
+      - Brick command to run (create, destroy)
   pvname:
     required: false
     description:
@@ -114,7 +114,6 @@ class GlusterBrick(object):
         return ret
 
     def createLV(self, lvname, poolname, vgname, lvsize, chunksize, use_thinp):
-
         if lvsize.find("%FREE"):
             lvsize_string = "-l " + lvsize
         else:
@@ -187,7 +186,6 @@ class GlusterBrick(object):
 
     # create a single brick with user-supplied values/defaults
     def createBrick(self):
-
         # only creating one lv -> pool -> vg -> pv per Admin Guide recommendations
         # create pv
         self.createPV(self.pvname)
