@@ -1,0 +1,132 @@
+---
+# DESTROYS A GEOREP CASCADE CLUSTER - no takebacks (use with caution!!!)
+
+- hosts: IC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    master_volume_name: intervol
+    slave_host: "{{ groups.SC_MASTERNODE.0 }}"
+    slave_volume_name: slavevol
+
+  tasks:
+  - name: stop the geo-rep
+    glustergeorep: command=stop master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+  - name: delete the geo-rep
+    glustergeorep: command=delete master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+
+- hosts: MC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    master_volume_name: mastervol
+    slave_host: "{{ groups.IC_MASTERNODE.0 }}"
+    slave_volume_name: intervol
+    
+  tasks:
+  - name: stop the geo-rep
+    glustergeorep: command=stop master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+  - name: delete the geo-rep
+    glustergeorep: command=delete master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    ignore_errors: yes
+
+
+# DESTROY THE MASTER CLUSTER
+- hosts: MC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: stop volumes
+    glustervolume: command=stop name=mastervol
+    ignore_errors: yes
+
+  - name: delete volumes
+    glustervolume: command=delete name=mastervol
+    ignore_errors: yes
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['MC_PEERS']
+    ignore_errors: yes
+
+
+# DESTROY THE INTER CLUSTER
+- hosts: IC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: stop volumes
+    glustervolume: command=stop name=intervol
+    ignore_errors: yes
+
+  - name: delete volumes
+    glustervolume: command=delete name=intervol
+    ignore_errors: yes
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['IC_PEERS']
+    ignore_errors: yes
+
+
+# DESTROY THE SLAVE CLUSTER
+- hosts: SC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: stop volumes
+    glustervolume: command=stop name=slavevol
+    ignore_errors: yes
+
+  - name: delete volumes
+    glustervolume: command=delete name=slavevol
+    ignore_errors: yes
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['SC_PEERS']
+    ignore_errors: yes
+
+
+# DESTROY THE BRICKS
+- hosts: NODES
+  gather_facts: no
+  remote_user: root
+  vars:
+    vgname_prefix: vg_gluster
+    poolname_prefix: lv_pool
+    lvname_prefix: lv_brick
+    fslabel_prefix: brick
+    mountpoint_prefix: "/bricks/fs_gluster"
+    brickname: brick
+
+  tasks:
+  - name: auto destroy bricks
+    glusterbrick: command=autodestroy vgname={{ vgname_prefix }} poolname={{ poolname_prefix }} lvname={{ lvname_prefix }} fslabel={{ fslabel_prefix }} mountpoint={{ mountpoint_prefix }} brickname={{ brickname }}
+    register: num_bricks
+    ignore_errors: yes
+    tags:
+      autodestroy_bricks
+
+
+# REMOVE THE PEM FILES
+- hosts: NODES
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: remove pem files
+    shell: 'rm -f /var/lib/glusterd/geo-replication/*pem*'
+    ignore_errors: yes
+    tags:
+      remove_pemfiles
+

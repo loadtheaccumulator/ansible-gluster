@@ -1,0 +1,81 @@
+---
+# EXAMPLE: Create a gluster REPLICATED volume with specific prefixes in playbook
+
+# CREATE BRICKS ON SERVERS
+- hosts: NODES
+  gather_facts: no
+  remote_user: root
+  vars:
+    vgname_prefix: vg_gluster
+    poolname_prefix: lv_pool
+    lvname_prefix: lv_brick
+    fslabel_prefix: brick
+    mountpoint_prefix: "/bricks/fs_gluster"
+    brickname: brick
+
+  tasks:
+  - name: auto create bricks
+    glusterbrick: command=autocreate vgname={{ vgname_prefix }} poolname={{ poolname_prefix }} lvname={{ lvname_prefix }} fslabel={{ fslabel_prefix }} mountpoint={{ mountpoint_prefix }} brickname={{ brickname }}
+    register: num_bricks
+    tags:
+      autocreate_bricks
+
+
+- hosts: MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    volumename: glustervol1
+    replica: 2
+    mountpoint_prefix: "/bricks/fs_gluster"
+    brickname: brick
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  groups['PEERS']
+    tags:
+      add_peers
+
+  - name: create a volume
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks=1 servers="{{ groups.NODES|join(' ') }}"
+    tags:
+      autocreate_volume
+
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    tags:
+      start_volume
+
+  - name: set an option
+    glustervolume: command=set name={{ volumename }} option=performance.readdir-ahead value=off
+    tags:
+      set_option
+
+
+# TODO: move this to an include
+- hosts: MASTERNODE
+  gather_facts: no
+  remote_user: root
+  tasks:
+  - name: show PV info
+    command: pvs
+    register: pvinfo
+
+  - name: show VG info
+    command: vgs
+    register: vginfo
+
+  - name: show LV info
+    command: lvs
+    register: lvinfo
+
+  - name: show gluster volume info
+    command: gluster volume info
+    register: volinfo
+
+  - debug: var=pvinfo.stdout_lines
+  - debug: var=vginfo.stdout_lines
+  - debug: var=lvinfo.stdout_lines
+  - debug: var=volinfo.stdout_lines
+

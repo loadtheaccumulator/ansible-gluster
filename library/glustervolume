@@ -26,7 +26,7 @@ author: Jonathan Holloway
 short_description: gluster volume module
 description:
   - This module handles gluster volume configurations.
-version_added: "0.1"
+version_added: "0.2"
 options:
   command:
     required: true
@@ -56,6 +56,14 @@ options:
     required: false
     description:
       - The value used for the volume set command
+  num_bricks:
+    required: false
+    description:
+      - The number of bricks to autocreate (used with servers)
+  servers:
+    required: false
+    description:
+      - The hostnames of the masternode and peers to generate brick names
 
 """
 
@@ -64,7 +72,7 @@ EXAMPLES = r"""
 - glustervolume: command=create name=glustervol1 bricks="server1.example.com:/gluster1/brick server2.example.com:/gluster1/brick"
 
 # create a simple REPLICATED volume
-- glustervolume: command=create name=glustervol1 replica=2 transport tcp bricks="server1.example.com:/gluster1/brick server2.example.com:/gluster1/brick"
+- glustervolume: command=create name=glustervol1 replica=2 transport=tcp bricks="server1.example.com:/gluster1/brick server2.example.com:/gluster1/brick"
 
 # start a volume
 - glustervolume: command=start name=glustervol1
@@ -90,6 +98,9 @@ EXAMPLES = r"""
 - glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=status
 - glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=commit
 - glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=stop
+
+# automatically create a volume with number of bricks and hostnames of servers in pool
+- glustervolume: command=create name=glustervol1 replica=2 transport=tcp num_bricks=4 servers="server1.example.com server2.example.com"
 """
 
 class GlusterVolume(object):
@@ -126,7 +137,7 @@ class GlusterVolume(object):
 
         (ret, sout, serr) = self.module.run_command (command_string)
 
-        return ret,sout,serr
+        return ret, command_string, serr
 
     def set(self):
         command_string = "gluster volume set %s %s %s" % (self.name, self.option, self.value)
@@ -185,17 +196,24 @@ class GlusterVolume(object):
 
         return ret,sout,serr
 
+    # helper function used to compile brick list
+    def addBrick(self, brick):
+        self.bricks += "%s " % brick
+
+        return
 
 def main():
     module = AnsibleModule(
         argument_spec=dict(
             command=dict(required=True),
-            name=dict(required=False, default=""),
+            name=dict(required=False, default="glustervol"),
             replica=dict(required=False, default=""),
             transport=dict(required=False, default="tcp"),
             bricks=dict(required=False, default=""),
             option=dict(required=False),
-            value=dict(required=False)
+            value=dict(required=False),
+            num_bricks=dict(required=False),
+            servers=dict(required=False)
         )
     )
 
@@ -222,6 +240,18 @@ def main():
         (ret, output, serr) = volume.add_brick()
     elif (params['command'] == "remove-brick"):
         (ret, output, serr) = volume.remove_brick()
+    elif (params['command'] == "autocreate"):
+        for brick_counter in range(1, int(params['num_bricks']) + 1):
+            if int(params['num_bricks']) >= 100:
+                brick_counter_string = "%03d" % brick_counter
+            else:
+                brick_counter_string = "%02d" % brick_counter
+
+            # TODO: parameterize this
+            for server in params['servers'].split(" "):
+                volume.addBrick("%s:/bricks/fs_gluster%s/brick" % (server, brick_counter_string))
+
+        (ret, output, serr) = volume.create()
     else:
         ret = 1
         sout = ""

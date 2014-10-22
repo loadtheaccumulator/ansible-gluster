@@ -1,0 +1,74 @@
+---
+# DESTROYS A CLUSTER - no takebacks (use with caution!!!)
+
+- hosts: MASTERNODE
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: stop volume
+    glustervolume: command=stop name=glustervol1
+    ignore_errors: yes
+    tags:
+      - stop_volume
+
+  - name: delete volume
+    glustervolume: command=delete name=glustervol1
+    ignore_errors: yes
+    tags:
+      - delete_volume
+
+  - name: detach peers
+    glusterpeer: command=detach name={{ item }}
+    with_items:  groups['PEERS']
+    ignore_errors: yes
+    tags:
+      - detach_peers
+
+
+- hosts: NODES
+  gather_facts: no
+  remote_user: root
+  vars:
+    vgname_prefix: vg_gluster
+    poolname_prefix: lv_pool
+    lvname_prefix: lv_brick
+    fslabel_prefix: brick
+    mountpoint_prefix: "/bricks/fs_gluster"
+    brickname: brick
+
+  tasks:
+  - name: auto destroy bricks
+    glusterbrick: command=autodestroy vgname={{ vgname_prefix }} poolname={{ poolname_prefix }} lvname={{ lvname_prefix }} fslabel={{ fslabel_prefix }} mountpoint={{ mountpoint_prefix }} brickname={{ brickname }}
+    register: num_bricks
+    ignore_errors: yes
+    tags:
+      autodestroy_bricks
+
+
+# TODO: move this to an include
+- hosts: MASTERNODE
+  gather_facts: no
+  remote_user: root
+  tasks:
+  - name: show PV info
+    command: pvs
+    register: pvinfo
+
+  - name: show VG info
+    command: vgs
+    register: vginfo
+
+  - name: show LV info
+    command: lvs
+    register: lvinfo
+
+  - name: show gluster volume info
+    command: gluster volume info
+    register: volinfo
+
+  - debug: var=pvinfo.stdout_lines
+  - debug: var=vginfo.stdout_lines
+  - debug: var=lvinfo.stdout_lines
+  - debug: var=volinfo.stderr
+

@@ -1,0 +1,64 @@
+---
+# EXAMPLE: Automatically create a gluster DISTRIBUTED volume with defaults
+
+# CREATE BRICKS ON SERVERS
+- hosts: NODES
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: auto create bricks
+    glusterbrick: command=autocreate
+    register: num_bricks
+    tags:
+      autocreate_bricks
+
+
+- hosts: MASTERNODE
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  groups['PEERS']
+    tags:
+      add_peers
+
+  - name: create a volume
+    glustervolume: command=autocreate num_bricks={{ num_bricks.msg }} servers="{{ groups.NODES|join(' ') }}"
+    tags:
+      autocreate_volume
+
+  - name: start a volume
+    glustervolume: command=start
+    tags:
+      start_volume
+
+
+# TODO: move this to an include
+- hosts: MASTERNODE
+  gather_facts: no
+  remote_user: root
+  tasks:
+  - name: show PV info
+    command: pvs
+    register: pvinfo
+
+  - name: show VG info
+    command: vgs
+    register: vginfo
+
+  - name: show LV info
+    command: lvs
+    register: lvinfo
+
+  - name: show gluster volume info
+    command: gluster volume info
+    register: volinfo
+
+  - debug: var=pvinfo.stdout_lines
+  - debug: var=vginfo.stdout_lines
+  - debug: var=lvinfo.stdout_lines
+  - debug: var=volinfo.stdout_lines
+

@@ -1,0 +1,208 @@
+---
+# EXAMPLE: Setup and start cascading geo-replication
+
+# CREATE BRICKS ON SERVERS
+- hosts: NODES
+  gather_facts: no
+  remote_user: root
+
+  tasks:
+  - name: auto create bricks
+    glusterbrick: command=autocreate
+    register: num_bricks
+    tags:
+      autocreate_bricks
+
+
+# SETUP THE MASTER CLUSTER
+- hosts: MC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    volumename: mastervol
+    replica: 2
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  groups['MC_PEERS']
+    tags:
+      add_peers
+
+  - name: create a volume
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ num_bricks.msg }} servers="{{ groups.MC_NODES|join(' ') }}"
+    tags:
+      autocreate_volume
+
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    tags:
+      start_volume
+
+
+# SETUP THE INTER CLUSTER
+- hosts: IC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    volumename: intervol
+    replica: 2
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  groups['IC_PEERS']
+    tags:
+      add_peers
+
+  - name: create a volume
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ num_bricks.msg }} servers="{{ groups.IC_NODES|join(' ') }}"
+    tags:
+      autocreate_volume
+
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    tags:
+      start_volume
+
+
+# SETUP THE SLAVE CLUSTER
+- hosts: SC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    volumename: slavevol
+    replica: 2
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  groups['SC_PEERS']
+    tags:
+      add_peers
+
+  - name: create a volume
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ num_bricks.msg }} servers="{{ groups.SC_NODES|join(' ') }}"
+    tags:
+      autocreate_volume
+
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    tags:
+      start_volume
+
+
+# THE GEO-REP STUFF
+- hosts: MC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    master_volume_name: mastervol
+    slave_host: "{{ groups.IC_MASTERNODE.0 }}"
+    slave_volume_name: intervol
+    
+  tasks:
+  - name: create the geo-rep
+    glustergeorep: command=create master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      - georep
+      - georep_create
+
+  - name: start the geo-rep
+    glustergeorep: command=start master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      - georep
+      - georep_start
+
+  - name: geo-rep status
+    glustergeorep: command=status master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      - georep
+      - georep_status
+
+- hosts: IC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    master_volume_name: intervol
+    slave_host: "{{ groups.SC_MASTERNODE.0 }}"
+    slave_volume_name: slavevol
+    
+  tasks:
+  - name: create the geo-rep
+    glustergeorep: command=create master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      - georep
+      - georep_create
+
+  - name: start the geo-rep
+    glustergeorep: command=start master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      - georep
+      - georep_start
+
+  - name: geo-rep status
+    glustergeorep: command=status master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+    tags:
+      - georep
+      - georep_status
+
+
+# TODO: move this to an include
+- hosts: [ MC_MASTERNODE, IC_MASTERNODE, SC_MASTERNODE ]
+  gather_facts: no
+  remote_user: root
+  tasks:
+  - name: show PV info
+    command: pvs
+    register: pvinfo
+
+  - name: show VG info
+    command: vgs
+    register: vginfo
+
+  - name: show LV info
+    command: lvs
+    register: lvinfo
+
+  - name: show gluster volume info
+    command: gluster volume info
+    register: volinfo
+
+  - debug: var=pvinfo.stdout_lines
+  - debug: var=vginfo.stdout_lines
+  - debug: var=lvinfo.stdout_lines
+  - debug: var=volinfo.stdout_lines
+
+# TODO: move this to an include
+- hosts: MC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    master_volume_name: mastervol
+    slave_host: "{{ groups.IC_MASTERNODE.0 }}"
+    slave_volume_name: intervol
+
+  tasks:
+  - name: show georep status
+    command: gluster volume geo-replication {{ master_volume_name }} {{ slave_host }}::{{ slave_volume_name }} status
+    register: georepstatus
+
+  - debug: var=georepstatus.stdout_lines
+
+# TODO: move this to an include
+- hosts: IC_MASTERNODE
+  gather_facts: no
+  remote_user: root
+  vars:
+    master_volume_name: intervol
+    slave_host: "{{ groups.SC_MASTERNODE.0 }}"
+    slave_volume_name: slavevol
+
+  tasks:
+  - name: show georep status
+    command: gluster volume geo-replication {{ master_volume_name }} {{ slave_host }}::{{ slave_volume_name }} status
+    register: georepstatus
+
+  - debug: var=georepstatus.stdout_lines
+  

@@ -27,7 +27,7 @@ author: Jonathan Holloway
 short_description: gluster brick module
 description:
   - This module handles gluster brick configurations.
-version_added: "0.1"
+version_added: "0.2"
 options:
   command:
     required: true
@@ -76,6 +76,7 @@ class GlusterBrick(object):
 
     def __init__(self, module):
         self.module = module
+# TODO: set defaults
         self.pvname = module.params['pvname']
         self.vgname = module.params['vgname']
         self.poolname = module.params['poolname']
@@ -85,9 +86,7 @@ class GlusterBrick(object):
         self.brickname = module.params['brickname']
         self.use_thinp = module.params['use_thinp']
 
-        if self.use_thinp == None:
-            self.use_thinp = "yes"
-
+# TODO: set defaults
         self.stripe_size = "256k"
         self.stripe_elements = 10
         self.data_alignment = "2560k"        # stripe_size * stripe_elements (see Admin Guide)
@@ -104,6 +103,9 @@ class GlusterBrick(object):
         # TODO: add logic for tuning option(s) per Admin Guide
         pv_command = "pvcreate --dataalignment %s %s" % (self.data_alignment, pvname)
         (ret, sout, serr) = self.module.run_command(pv_command)
+
+        if ret != 0:
+            self.module.fail_json (msg="createPV(%s) failed with: %s" % (pvname, serr))
 
         return
 
@@ -244,25 +246,80 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             command=dict(required=True),
-            pvname=dict(required=False),
-            vgname=dict(required=False),
-            poolname=dict(required=False),
-            lvname=dict(required=False),
-            fslabel=dict(required=False),
-            mountpoint=dict(required=False),
-            brickname=dict(required=False),
-            use_thinp=dict(required=False)
+            devices=dict(required=False),
+            pvname=dict(required=False),        #deprecate this
+            vgname=dict(required=False, default="vg_gluster"),
+            poolname=dict(required=False, default="lv_pool"),
+            lvname=dict(required=False, default="lv_brick"),
+            fslabel=dict(required=False, default="brick"),
+            mountpoint=dict(required=False, default="/bricks/fs_gluster"),
+            brickname=dict(required=False, default="brick"),
+            use_thinp=dict(required=False, default="yes"),
+            ignore_devices=dict(required=False),
+            skip_numbering=dict(required=False, default="no")
         )
     )
 
     params = module.params
-    brick = GlusterBrick(module)
 
     output=""
     if (params['command'] == "create_brick"):
+        brick = GlusterBrick(module)
+
         (ret,output,serr) = brick.createBrick()
     elif (params['command'] == "destroy_brick"):
+        brick = GlusterBrick(module)
+
         (ret,output,serr) = brick.destroyBrick()
+    elif (params['command'] == "autocreate"):
+        device_list = os.popen("lvmdiskscan | egrep 'sd|vd' | egrep -v 'sda|vda' | awk '{print $1}'").readlines()
+
+        device_counter = 0
+        for thedevice in device_list:
+            device_counter += 1
+
+            brick = GlusterBrick(module)
+
+            # format device_counter with leading zeros
+            if len(device_list) >= 100:
+                device_counter_string = "%03d" % device_counter
+            else:
+                device_counter_string = "%02d" % device_counter
+
+            brick.pvname = thedevice
+            brick.vgname = "%s%s" % (module.params['vgname'], device_counter_string)
+            brick.poolname = "%s%s" % (module.params['poolname'], device_counter_string)
+            brick.lvname = "%s%s" % (module.params['lvname'], device_counter_string)
+            brick.fslabel = "%s%s" % (module.params['fslabel'], device_counter_string)
+            brick.mountpoint = "%s%s" % (module.params['mountpoint'], device_counter_string)
+
+# TODO: this needs to collate the returns from all bricks and return something useful
+            (ret,output,serr) = brick.createBrick()
+            
+            output = device_counter
+    elif (params['command'] == "autodestroy"):
+        device_list = os.popen("lvmdiskscan | egrep 'sd|vd' | egrep -v 'sda|vda' | awk '{print $1}'").readlines()
+
+        device_counter = 0
+        for thedevice in device_list:
+            device_counter += 1
+
+            brick = GlusterBrick(module)
+
+            if len(device_list) >= 100:
+                device_counter_string = "%03d" % device_counter
+            else:
+                device_counter_string = "%02d" % device_counter
+
+            brick.pvname = thedevice
+            brick.vgname = "%s%s" % (module.params['vgname'], device_counter_string)
+            brick.poolname = "%s%s" % (module.params['poolname'], device_counter_string)
+            brick.lvname = "%s%s" % (module.params['lvname'], device_counter_string)
+            brick.fslabel = "%s%s" % (module.params['fslabel'], device_counter_string)
+            brick.mountpoint = "%s%s" % (module.params['mountpoint'], device_counter_string)
+
+# TODO: this needs to collate the returns from all bricks and return something useful
+            (ret,output,serr) = brick.destroyBrick()
     else:
         ret = 1
         output = ""
