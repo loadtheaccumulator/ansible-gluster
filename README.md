@@ -39,6 +39,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
     ```
 
 4. Edit the example playbooks to specify the devices to be used for bricks.
+
     NOTE: This is only necessary for the examples in the examples/ex_manual/ or if you want to use partitions on your root disk
 
     e.g., to use an unused partition /dev/sda6 on the root disk of your servers, in the manual/ex_replicated_volume.yml file replace...
@@ -69,7 +70,9 @@ To use the example playbooks, you will need at least two servers (baremetal or v
     ```
 
 7. To undo everything and destroy the gluster cluster you just setup...
-    NOTE: THIS IS DESTRUCTIVE AND COULD DESTROY ALL VOLUMES, MOUNTS, LVM CONFIGS, AND THE KNOWN UNIVERSE
+
+    NOTE: THIS IS DESTRUCTIVE AND COULD DESTROY ALL VOLUMES, MOUNTS, LVM CONFIGS, AND THE KNOWN UNIVERSE!
+
             PROCEED WITH CAUTION!!!
 
     ```
