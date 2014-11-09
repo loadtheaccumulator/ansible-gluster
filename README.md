@@ -71,9 +71,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
 7. To undo everything and destroy the gluster cluster you just setup...
 
-    NOTE: THIS IS DESTRUCTIVE AND COULD DESTROY ALL VOLUMES, MOUNTS, LVM CONFIGS, AND THE KNOWN UNIVERSE!
-
-            PROCEED WITH CAUTION!!!
+    NOTE: THIS IS DESTRUCTIVE AND COULD DESTROY ALL VOLUMES, MOUNTS, LVM CONFIGS, AND THE KNOWN UNIVERSE! PROCEED WITH CAUTION!!!
 
     ```
     $ ansible-playbook -i ex_hosts_distrep -vv ex_manual/ex_destroy_distributed-replicated.yml
