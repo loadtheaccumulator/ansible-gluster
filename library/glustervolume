@@ -100,7 +100,7 @@ EXAMPLES = r"""
 - glustervolume: command=remove-brick name=glustervol1 bricks="server1.example.com:/gluster2/brick server2.example.com:/gluster2/brick" option=stop
 
 # automatically create a volume with number of bricks and hostnames of servers in pool
-- glustervolume: command=create name=glustervol1 replica=2 transport=tcp num_bricks=4 servers="server1.example.com server2.example.com"
+- glustervolume: command=autocreate name=glustervol1 replica=2 transport=tcp num_bricks=4 servers="server1.example.com server2.example.com"
 """
 
 class GlusterVolume(object):

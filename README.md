@@ -14,8 +14,6 @@ As of this writing, the assumptions are:
 
 3. The servers have similar disk configurations with identical unused partitions across all servers.
 
-4. The disks to be used have been partitioned with at least one partition. (future ansible-gluster feature)
-
 To use the example playbooks, you will need at least two servers (baremetal or virtual) for the replicated example and, at most, six for the cascading geo-replication examples.
 
 ### Setting up:
@@ -30,7 +28,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
 3. Edit the example host files to specify the hostnames of your servers.
 
-      e.g., in the ex_hosts_distrep file replace server1.example.com and server2.example.com with the hostnames of two of your servers...
+      e.g., in the examples/ex_hosts_distrep file replace server1.example.com and server2.example.com with the hostnames of two of your servers...
 
     ```
     [MASTERNODE]
@@ -41,8 +39,9 @@ To use the example playbooks, you will need at least two servers (baremetal or v
     ```
 
 4. Edit the example playbooks to specify the devices to be used for bricks.
+    NOTE: This is only necessary for the examples in the examples/ex_manual/ or if you want to use partitions on your root disk
 
-    e.g., to use an unused partition /dev/sda6 on the root disk of your servers, in the ex_replicated_volume.yml file replace...
+    e.g., to use an unused partition /dev/sda6 on the root disk of your servers, in the manual/ex_replicated_volume.yml file replace...
 
     ```
     pvnames:
@@ -60,7 +59,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
     ```
     $ cd examples
-    $ ansible-playbook -i ex_hosts_distrep -v ex_replicated_volume.yml
+    $ ansible-playbook -i ex_hosts_distrep -vv ex_manual/ex_replicated_volume.yml
     ```
 
 6. Login to the server listed under [MASTERNODE] and check the volume.
@@ -68,3 +67,13 @@ To use the example playbooks, you will need at least two servers (baremetal or v
     ```
     # gluster volume info
     ```
+
+7. To undo everything and destroy the gluster cluster you just setup...
+    NOTE: THIS IS DESTRUCTIVE AND COULD DESTROY ALL VOLUMES, MOUNTS, LVM CONFIGS, AND THE KNOWN UNIVERSE
+            PROCEED WITH CAUTION!!!
+
+    ```
+    $ ansible-playbook -i ex_hosts_distrep -vv ex_manual/ex_destroy_distributed-replicated.yml
+    ```
+
+

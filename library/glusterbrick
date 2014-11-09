@@ -70,6 +70,9 @@ EXAMPLES = r"""
 
 # destroy a brick and everything under it back to the device level (pv, vg, lv pool, lv, and mount/fstab)
 - glusterbrick: command=destroy_brick pvname=/dev/sda2 vgname=vg_gluster1 poolname=lv_pool1 lvname=lv_brick1 mountpoint=/gluster1 brickname=brick"
+
+# automatically create bricks on discovered devices and use default names (returns number of bricks created)
+- glusterbrick: command=autocreate
 """
 
 class GlusterBrick(object):
