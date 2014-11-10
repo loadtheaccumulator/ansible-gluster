@@ -127,7 +127,7 @@
   - debug: var=volinfo.stdout_lines
 
 # TODO: move this to an include
-- hosts: MASTERNODE
+- hosts: MC_MASTERNODE
   gather_facts: no
   remote_user: root
   vars:

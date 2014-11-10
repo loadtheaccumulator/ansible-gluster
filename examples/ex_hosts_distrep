@@ -1,20 +1,24 @@
 # This is an example ansible 'hosts' file.
 #
 # It can be used with playbooks:
-#   ex_distributed_volume.yml
-#   ex_distributed_replicated_volume.yml
+#   ex_destroy_distributed-replicated.yml
+#   ex_distributed.yml
+#   ex_distributed-replicated.yml
 #   ex_replicated.yml
-#   ex_destroy_gluster_volume.yml
 
+# change the example server hostnames to hostnames in your environment
 [MASTERNODE]
 server1.example.com
 
 [PEERS]
 server2.example.com
 
+[CLIENTS]
+server3.example.com
+
+
+# NO NEED TO EDIT BELOW THIS LINE
 [NODES:children]
 MASTERNODE
 PEERS
 
-[CLIENTS]
-server3.example.com
