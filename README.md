@@ -60,7 +60,7 @@ To use the example playbooks, you will need at least two servers (baremetal or v
 
     ```
     $ cd examples
-    $ ansible-playbook -i ex_hosts_distrep -vv ex_manual/ex_replicated_volume.yml
+    $ ansible-playbook -i ex_hosts_distrep -vv ex_manual/ex_replicated.yml
     ```
 
 6. Login to the server listed under [MASTERNODE] and check the volume.
