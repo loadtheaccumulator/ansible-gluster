@@ -1,0 +1,225 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2014 Jonathan Holloway <loadtheaccumulator@gmail.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+
+DOCUMENTATION = """
+---
+module: glustersnapshot
+author: Jonathan Holloway
+short_description: gluster snapshot module
+description:
+  - This module handles gluster volume configurations.
+version_added: "0.1"
+options:
+  command:
+    required: true
+    description:
+      - Volume command to run (status, info, create, ...)
+  name:
+    required: false
+    description:
+      - The name of the volume
+  replica:
+    required: false
+    description:
+      - The replica value to pass to the create command
+  transport:
+    required: false
+    description:
+      - The transport type for the volume create command (tcp, rdma)
+  bricks:
+    required: false
+    description:
+      - A space-delimited list of bricks
+  option:
+    required: false
+    description:
+      - The option used for the volume set command
+  value:
+    required: false
+    description:
+      - The value used for the volume set command
+  num_bricks:
+    required: false
+    description:
+      - The number of bricks to autocreate (used with servers)
+  servers:
+    required: false
+    description:
+      - The hostnames of the masternode and peers to generate brick names
+
+"""
+
+EXAMPLES = r"""
+# create a snapshot
+- glustersnapshot: command=create snapname=snap1 volumename=glustervol1 description="my gluster volume snapshot"
+
+# list snapshots for a volume
+- glustersnapshot: command=list volumename=glustervol1
+
+# get status for snapshots
+- glustersnapshot: command=status
+- glustersnapshot: command=status volumename=glustervol1
+- glustersnapshot: command=status snapname=snap1
+
+# get info for snapshots
+- glustersnapshot: command=info
+- glustersnapshot: command=info volumename=glustervol1
+- glustersnapshot: command=info snapname=snap1
+
+# activate a snapshot
+- glustersnapshot: command=activate name=snap1
+
+# deactivate a snapshot
+- glustersnapshot: command=deactivate name=snap1
+
+# config snapshot options for a volume
+- glustersnapshot: command=config volumename=glustervol1 option=auto-delete value=enable
+
+# delete a snapshot
+- glustersnapshot: command=delete snapname=snap1
+
+# restore a snapshot
+- glustersnapshot: command=restore snapname=snap1
+
+"""
+
+class GlusterSnapshot(object):
+
+    def __init__(self, module):
+        self.module = module
+        self.snapname = module.params['snapname']
+        self.volumename = module.params['volumename']
+        self.description = module.params['description']
+        self.option = module.params['option']
+        self.value = module.params['value']
+
+    def info(self):
+        if snapname == "" and volumename != "":
+            option_string = volumename
+        elif snapname != "" and volumename == "":
+            option_string = snapname
+        else:
+            option_string = ""
+
+        command_string = "gluster snapshot info " + option_string
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def status(self):
+        if snapname == "" and volumename != "":
+            option_string = volumename
+        elif snapname != "" and volumename == "":
+            option_string = snapname
+        else:
+            option_string = ""
+
+        command_string = "gluster snapshot status " + option_string
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+    def create(self):
+# TODO: add force option
+# TODO: possible to determine if geo-rep is setup and pause it automatically?
+        command_string = "gluster snapshot create --mode=script %s %s %s" % (self.snapname, self.volumename, self.description)
+
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret, command_string, serr
+
+    def list(self):
+        command_string = "gluster snapshot list %s" % (self.volumename)
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def config(self):
+        command_string = "gluster snapshot config %s %s %s" % (self.volumename, self.option, self.value)
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def activate(self):
+# TODO: add force option
+        command_string = "gluster snapshot activate %s" % self.snapname
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def deactivate(self):
+        command_string = "gluster snapshot deactivate --mode=script %s" % self.snapname
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def delete(self):
+        command_string = "gluster snapshot delete --mode=script %s" % self.snapname
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+    def restore(self):
+        # optional: option=full
+        command_string = "gluster snapshot restore --mode=script %s" % (self.snapname)
+        (ret, sout, serr) = self.module.run_command(command_string)
+
+        return ret,sout,serr
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            command=dict(required=True),
+            snapname=dict(required=False),
+            volumename=dict(required=False),
+            option=dict(required=False),
+            value=dict(required=False)
+        )
+    )
+
+    params = module.params
+    snapshot = GlusterSnapshot(module)
+
+    if (params['command'] == "info"):
+        (ret, output, serr) = snapshot.info()
+    elif (params['command'] == "status"):
+        (ret, output, serr) = snapshot.status()
+    elif (params['command'] == "create"):
+        (ret, output, serr) = snapshot.create()
+    elif (params['command'] == "activate"):
+        (ret, output, serr) = volume.start()
+    elif (params['command'] == "deactivate"):
+        (ret, output, serr) = volume.stop()
+    elif (params['command'] == "delete"):
+        (ret, output, serr) = volume.delete()
+    elif (params['command'] == "restore"):
+        (ret, output, serr) = volume.set()
+    elif (params['command'] == "list"):
+        (ret, output, serr) = volume.heal()
+    elif (params['command'] == "config"):
+        (ret, output, serr) = volume.add_brick()
+
+
+# import module snippets
+from ansible.module_utils.basic import *
+main()
+
