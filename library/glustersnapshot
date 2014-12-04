@@ -69,9 +69,12 @@ options:
 
 EXAMPLES = r"""
 # create a snapshot
-- glustersnapshot: command=create snapname=snap1 volumename=glustervol1 description="my gluster volume snapshot"
+- glustersnapshot: command=create snapname=snap1 volumename=glustervol1
+# create a snapshot with description
+- glustersnapshot: command=create snapname=snap1 volumename=glustervol1 description='my gluster volume snapshot'
 
-# list snapshots for a volume
+# list snapshots
+- glustersnapshot: command=list
 - glustersnapshot: command=list volumename=glustervol1
 
 # get status for snapshots
@@ -90,13 +93,18 @@ EXAMPLES = r"""
 # deactivate a snapshot
 - glustersnapshot: command=deactivate name=snap1
 
+# config snapshot auto-delete option
+- glustersnapshot: command=config option=auto-delete value=enable
+- glustersnapshot: command=config option=auto-delete value=disable
+
 # config snapshot options for a volume
-- glustersnapshot: command=config volumename=glustervol1 option=auto-delete value=enable
+- glustersnapshot: command=config volumename=glustervol1 option=snap-max-hard-limit value=4
 
 # delete a snapshot
 - glustersnapshot: command=delete snapname=snap1
 
-# restore a snapshot
+# restore a snapshot (must stop volume first)
+- glustervolume: command=stop name=glustervol1
 - glustersnapshot: command=restore snapname=snap1
 
 """
@@ -112,10 +120,10 @@ class GlusterSnapshot(object):
         self.value = module.params['value']
 
     def info(self):
-        if snapname == "" and volumename != "":
-            option_string = "volume " + volumename
-        elif snapname != "" and volumename == "":
-            option_string = snapname
+        if self.snapname == "" and self.volumename != "":
+            option_string = "volume " + self.volumename
+        elif self.snapname != "" and self.volumename == "":
+            option_string = self.snapname
         else:
             option_string = ""
 
@@ -125,10 +133,10 @@ class GlusterSnapshot(object):
         return ret,sout,serr
 
     def status(self):
-        if snapname == "" and volumename != "":
-            option_string = "volume " + volumename
-        elif snapname != "" and volumename == "":
-            option_string = snapname
+        if self.snapname == "" and self.volumename != "":
+            option_string = "volume " + self.volumename
+        elif self.snapname != "" and self.volumename == "":
+            option_string = self.snapname
         else:
             option_string = ""
 
@@ -140,9 +148,13 @@ class GlusterSnapshot(object):
     def create(self):
 # TODO: add force option
 # TODO: possible to determine if geo-rep is setup and pause it automatically?
-        command_string = "gluster snapshot create --mode=script %s %s %s" % (self.snapname, self.volumename, self.description)
+        if self.description != "" and self.description != None:
+            description_string = "description %s" % self.description
+        else:
+            description_string = ""
+        command_string = "gluster snapshot create %s %s %s --mode=script" % (self.snapname, self.volumename, description_string)
 
-        (ret, sout, serr) = self.module.run_command (command_string)
+        (ret, sout, serr) = self.module.run_command(command_string)
 
         return ret, command_string, serr
 
@@ -154,33 +166,34 @@ class GlusterSnapshot(object):
 
     def config(self):
 # TODO: add list when no-parms are passed and when only a volume name is passed
-        command_string = "gluster snapshot config %s %s %s" % (self.volumename, self.option, self.value)
+# TODO: handle auto-delete
+        command_string = "gluster snapshot config %s %s %s --mode=script" % (self.volumename, self.option, self.value)
         (ret, sout, serr) = self.module.run_command(command_string)
 
         return ret,sout,serr
 
     def activate(self):
 # TODO: add force option
-        command_string = "gluster snapshot activate %s" % self.snapname
+        command_string = "gluster snapshot activate %s --mode=script" % self.snapname
         (ret, sout, serr) = self.module.run_command(command_string)
 
         return ret,sout,serr
 
     def deactivate(self):
-        command_string = "gluster snapshot deactivate --mode=script %s" % self.snapname
+        command_string = "gluster snapshot deactivate %s --mode=script" % self.snapname
         (ret, sout, serr) = self.module.run_command(command_string)
 
         return ret,sout,serr
 
     def delete(self):
-        command_string = "gluster snapshot delete --mode=script %s" % self.snapname
+        command_string = "gluster snapshot delete %s --mode=script" % self.snapname
         (ret, sout, serr) = self.module.run_command(command_string)
 
         return ret,sout,serr
 
     def restore(self):
         # optional: option=full
-        command_string = "gluster snapshot restore --mode=script %s" % (self.snapname)
+        command_string = "gluster snapshot restore %s --mode=script" % (self.snapname)
         (ret, sout, serr) = self.module.run_command(command_string)
 
         return ret,sout,serr
@@ -190,10 +203,11 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             command=dict(required=True),
-            snapname=dict(required=False),
-            volumename=dict(required=False),
-            option=dict(required=False),
-            value=dict(required=False)
+            snapname=dict(required=False, default=""),
+            volumename=dict(required=False, default=""),
+            option=dict(required=False, default=""),
+            value=dict(required=False, default=""),
+            description=dict(required=False, default="")
         )
     )
 
@@ -207,17 +221,26 @@ def main():
     elif (params['command'] == "create"):
         (ret, output, serr) = snapshot.create()
     elif (params['command'] == "activate"):
-        (ret, output, serr) = volume.start()
+        (ret, output, serr) = snapshot.activate()
     elif (params['command'] == "deactivate"):
-        (ret, output, serr) = volume.stop()
+        (ret, output, serr) = snapshot.deactivate()
     elif (params['command'] == "delete"):
-        (ret, output, serr) = volume.delete()
+        (ret, output, serr) = snapshot.delete()
     elif (params['command'] == "restore"):
-        (ret, output, serr) = volume.set()
+        (ret, output, serr) = snapshot.restore()
     elif (params['command'] == "list"):
-        (ret, output, serr) = volume.heal()
+        (ret, output, serr) = snapshot.list()
     elif (params['command'] == "config"):
-        (ret, output, serr) = volume.add_brick()
+        (ret, output, serr) = snapshot.config()
+    else:
+        ret = 1
+        output = ""
+        serr = "No valid command provided. Nothing to do."
+
+    if ret == 0:
+        module.exit_json(msg=output)
+    else:
+        module.fail_json(msg=output + ": " + serr)
 
 
 # import module snippets
