@@ -25,45 +25,33 @@ module: glustersnapshot
 author: Jonathan Holloway
 short_description: gluster snapshot module
 description:
-  - This module handles gluster volume configurations.
+  - This module handles gluster snapshot configurations.
 version_added: "0.1"
 options:
   command:
     required: true
     description:
-      - Volume command to run (status, info, create, ...)
-  name:
+      - Snapshot command to run (status, info, create, ...)
+  snapname:
+    required: false
+    description:
+      - The name of the snapshot
+  volumename:
     required: false
     description:
       - The name of the volume
-  replica:
+  description:
     required: false
     description:
-      - The replica value to pass to the create command
-  transport:
-    required: false
-    description:
-      - The transport type for the volume create command (tcp, rdma)
-  bricks:
-    required: false
-    description:
-      - A space-delimited list of bricks
+      - Description of the snapshot
   option:
     required: false
     description:
-      - The option used for the volume set command
+      - The option used for the snapshot set command
   value:
     required: false
     description:
-      - The value used for the volume set command
-  num_bricks:
-    required: false
-    description:
-      - The number of bricks to autocreate (used with servers)
-  servers:
-    required: false
-    description:
-      - The hostnames of the masternode and peers to generate brick names
+      - The value used for the snapshot set command
 
 """
 
