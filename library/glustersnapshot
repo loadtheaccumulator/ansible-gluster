@@ -165,8 +165,6 @@ class GlusterSnapshot(object):
         return ret,sout,serr
 
     def config(self):
-# TODO: add list when no-parms are passed and when only a volume name is passed
-# TODO: handle auto-delete
         command_string = "gluster snapshot config %s %s %s --mode=script" % (self.volumename, self.option, self.value)
         (ret, sout, serr) = self.module.run_command(command_string)
 
