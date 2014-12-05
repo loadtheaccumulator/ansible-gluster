@@ -137,7 +137,7 @@ class GlusterSnapshot(object):
 # TODO: add force option
 # TODO: possible to determine if geo-rep is setup and pause it automatically?
         if self.description != "" and self.description != None:
-            description_string = "description %s" % self.description
+            description_string = "description '%s'" % self.description
         else:
             description_string = ""
         command_string = "gluster snapshot create %s %s %s --mode=script" % (self.snapname, self.volumename, description_string)
