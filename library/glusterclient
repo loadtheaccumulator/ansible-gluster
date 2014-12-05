@@ -51,26 +51,29 @@ class GlusterClient(object):
 
     def __init__(self, module):
         self.module = module
+        self.server = module.params['server']
         self.volume = module.params['volume']
         self.mountpoint = module.params['mountpoint']
         self.type = module.params['type']
+        self.username = module.params['username']
+        self.password = module.params['password']
 
     def mount(self):
-# TODO: nfs and cifs mounts
         self.module.run_command ("mkdir -p %s" % self.mountpoint)
 
         if self.type == "glusterfs":
-            command_string = "mount -t %s %s %s" % (self.type, self.volume, self.mountpoint)
+            command_string = "mount -t %s %s:/%s %s" % (self.type, self.server, self.volume, self.mountpoint)
 
             (ret, sout, serr) = self.module.run_command (command_string)
         elif self.type == "nfs":
-            command_string = "mount -t %s -o vers=3,mountproto=tcp %s %s" % (self.type, self.volume, self.mountpoint)
+            command_string = "mount -t %s -o vers=3,mountproto=tcp %s:/%s %s" % (self.type, self.server, self.volume, self.mountpoint)
 
             (ret, sout, serr) = self.module.run_command (command_string)
         elif self.type == "cifs":
-            ret = 1
-            sout = "cifs not supported yet"
-            serr = ""
+# TODO: add passwordless logic
+            command_string = "mount -t %s -o username=%s,password=%s //%s/gluster-%s %s" % (self.type, self.username, self.password, self.server, self.volume, self.mountpoint)
+
+            (ret, sout, serr) = self.module.run_command (command_string)
 
         return ret,sout,serr
 
@@ -81,12 +84,26 @@ class GlusterClient(object):
         return ret,sout,serr
 
 # TODO: add an entry to fstab
+# NOTE: this do not work yet (placeholder)
     def insert_fstab(self):
+        fstab_entry_exists = False
+        for line in open("/etc/fstab"):
+            # TODO: make this whole word to avoid rhs1 rhs11 trap (and add lvname for good measure)
+            if re.search(device, line):
+                fstab_entry_exists = True
+
+        if not fstab_entry_exists:
+            mount_string = "%s   %s   xfs    inode64,noatime,nodiratime 1 2\n" % (device, self.mountpoint)
+            with open("/etc/fstab", "a") as fstabfile:
+                fstabfile.write (mount_string)
 
         return
 
 # TODO: remove an entry from fstab
+# NOTE: this do not work yet (placeholder)
     def remove_fstab(self):
+        searchstring = self.vgname + "-" + self.lvname
+        (ret, sout, serr) = self.module.run_command("sed -i '/" + searchstring + "/d' /etc/fstab")
 
         return
 
@@ -94,10 +111,13 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             command=dict(required=True),
+            server=dict(required=False),
             volume=dict(required=False),
             mountpoint=dict(required=False),
             type=dict(required=False),
-            options=dict(required=False)
+            options=dict(required=False),
+            username=dict(required=False),
+            password=dict(required=False)
         )
     )
 
@@ -108,6 +128,8 @@ def main():
     if (params['command'] == "mount"):
         if not params['mountpoint']:
             module.fail_json(msg="Missing mountpoint parameter.")
+        if not params['server']:
+            module.fail_json(msg="Missing server parameter.")
         if not params['volume']:
             module.fail_json(msg="Missing volume parameter.")
         if not params['type']:
