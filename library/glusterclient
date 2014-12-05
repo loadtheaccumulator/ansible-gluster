@@ -47,7 +47,7 @@ EXAMPLES = r"""
 - glusterclient: command=unmount mountpoint=/mnt/gluster-mount
 """
 
-class GlusterPeer(object):
+class GlusterClient(object):
 
     def __init__(self, module):
         self.module = module
@@ -102,7 +102,7 @@ def main():
     )
 
     params = module.params
-    client = GlusterPeer(module)
+    client = GlusterClient(module)
 
 # NOTE: can also use native ansible mount, but will soon have gluster-specific checks here
     if (params['command'] == "mount"):
