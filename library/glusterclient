@@ -1,0 +1,135 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Copyright 2014 Jonathan Holloway <loadtheaccumulator@gmail.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os
+
+DOCUMENTATION = """
+---
+module: glusterclient
+author: Jonathan Holloway
+short_description: gluster client module
+description:
+  - This module handles gluster client configurations.
+version_added: "0.1"
+options:
+  command:
+    required: true
+    description:
+      - peer command to run
+  name:
+    required: true
+    description:
+      - The name of the peer
+    required: false
+"""
+
+EXAMPLES = r"""
+# mount a gluster volume via fuse
+- glusterclient: command=mount volume=server1.example.com:/glustervol1 mountpoint=/mnt/gluster-mount
+
+# unmount a gluster volume
+- glusterclient: command=unmount mountpoint=/mnt/gluster-mount
+"""
+
+class GlusterPeer(object):
+
+    def __init__(self, module):
+        self.module = module
+        self.volume = module.params['volume']
+        self.mountpoint = module.params['mountpoint']
+        self.type = module.params['type']
+
+    def mount(self):
+# TODO: nfs and cifs mounts
+        self.module.run_command ("mkdir -p %s" % self.mountpoint)
+
+        if self.type == "glusterfs":
+            command_string = "mount -t %s %s %s" % (self.type, self.volume, self.mountpoint)
+
+            (ret, sout, serr) = self.module.run_command (command_string)
+        elif self.type == "nfs":
+            command_string = "mount -t %s -o vers=3,mountproto=tcp %s %s" % (self.type, self.volume, self.mountpoint)
+
+            (ret, sout, serr) = self.module.run_command (command_string)
+        elif self.type == "cifs":
+            ret = 1
+            sout = "cifs not supported yet"
+            serr = ""
+
+        return ret,sout,serr
+
+    def unmount(self):
+        command_string = "umount %s" % (self.mountpoint)
+        (ret, sout, serr) = self.module.run_command (command_string)
+
+        return ret,sout,serr
+
+# TODO: add an entry to fstab
+    def insert_fstab(self):
+
+        return
+
+# TODO: remove an entry from fstab
+    def remove_fstab(self):
+
+        return
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            command=dict(required=True),
+            volume=dict(required=False),
+            mountpoint=dict(required=False),
+            type=dict(required=False),
+            options=dict(required=False)
+        )
+    )
+
+    params = module.params
+    client = GlusterPeer(module)
+
+# NOTE: can also use native ansible mount, but will soon have gluster-specific checks here
+    if (params['command'] == "mount"):
+        if not params['mountpoint']:
+            module.fail_json(msg="Missing mountpoint parameter.")
+        if not params['volume']:
+            module.fail_json(msg="Missing volume parameter.")
+        if not params['type']:
+            module.fail_json(msg="Missing type parameter.")
+
+        (ret,output,serr) = client.mount()
+    elif (params['command'] == "unmount"):
+        if not params['mountpoint']:
+            module.fail_json(msg="Missing mountpoint parameter.")
+
+        (ret,output,serr) = client.unmount()
+    else:
+        ret = 1
+        output = ""
+        serr = "No valid command provided. Nothing to do."
+
+    if ret == 0:
+        module.exit_json(msg=output)
+    else:
+        module.fail_json(msg=output + ": " + serr)
+
+# import module snippets
+from ansible.module_utils.basic import *
+main()
+
