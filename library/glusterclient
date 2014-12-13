@@ -25,26 +25,56 @@ module: glusterclient
 author: Jonathan Holloway
 short_description: gluster client module
 description:
-  - This module handles gluster client configurations.
+  - This module handles gluster client mounts.
 version_added: "0.1"
 options:
   command:
     required: true
     description:
-      - peer command to run
-  name:
-    required: true
-    description:
-      - The name of the peer
+      - client command to run
+  server:
     required: false
+    description:
+      - The name of the server hosting the volume
+  volume:
+    required: false
+    description:
+      - The name of the gluster volume
+  mountpoint:
+    required: false
+    description:
+      - The path for the mountpoint on the client
+  type:
+    required: false
+    description:
+      - The type of mount (e.g., glusterfs, nfs, cifs)
+  options:
+    required: false
+    description:
+      - Mount command options
+  username:
+    required: false
+    description:
+      - The username required to mount the volume via cifs
+  password:
+    required: false
+    description:
+      - The password required to mount the volume via cifs
 """
 
 EXAMPLES = r"""
 # mount a gluster volume via fuse
-- glusterclient: command=mount volume=server1.example.com:/glustervol1 mountpoint=/mnt/gluster-mount
+- glusterclient: command=mount server=server1.example.com volume=glustervol1 mountpoint=/mnt/gluster-mount type=glusterfs
+
+# mount a gluster volume via nfs
+- glusterclient: command=mount server=server1.example.com volume=glustervol1 mountpoint=/mnt/gluster-mount type=nfs
+
+# mount a gluster volume via cifs (using the MASTERNODE in the ansible host file)
+- glusterclient: command=mount server={{ groups.MASTERNODE.0 }} volume=glustervol1 mountpoint=/mnt/gluster-mount type=cifs username=root password=pass1234
 
 # unmount a gluster volume
 - glusterclient: command=unmount mountpoint=/mnt/gluster-mount
+
 """
 
 class GlusterClient(object):
@@ -84,28 +114,11 @@ class GlusterClient(object):
         return ret,sout,serr
 
 # TODO: add an entry to fstab
-# NOTE: this do not work yet (placeholder)
-    def insert_fstab(self):
-        fstab_entry_exists = False
-        for line in open("/etc/fstab"):
-            # TODO: make this whole word to avoid rhs1 rhs11 trap (and add lvname for good measure)
-            if re.search(device, line):
-                fstab_entry_exists = True
-
-        if not fstab_entry_exists:
-            mount_string = "%s   %s   xfs    inode64,noatime,nodiratime 1 2\n" % (device, self.mountpoint)
-            with open("/etc/fstab", "a") as fstabfile:
-                fstabfile.write (mount_string)
-
-        return
+#    def insert_fstab(self):
 
 # TODO: remove an entry from fstab
-# NOTE: this do not work yet (placeholder)
-    def remove_fstab(self):
-        searchstring = self.vgname + "-" + self.lvname
-        (ret, sout, serr) = self.module.run_command("sed -i '/" + searchstring + "/d' /etc/fstab")
+#    def remove_fstab(self):
 
-        return
 
 def main():
     module = AnsibleModule(
