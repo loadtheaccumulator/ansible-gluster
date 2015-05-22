@@ -35,13 +35,13 @@ The examples in the other directories work, but were stepping stones to get to t
 1. On your ansible management system (can be your laptop or workstation), git clone the ansible-gluster repository or download and unzip.
 
     ```
-    # git clone https://github.com/loadtheaccumulator/ansible-gluster.git
+    $ git clone https://github.com/loadtheaccumulator/ansible-gluster.git
     ```
 
 2. Add the path to the ansible-gluster directory created in step 1 to the Ansible library path.
 
     ```
-     $ export ANSIBLE_LIBRARY=/path/to/ansible-gluster:/usr/share/ansible
+    $ export ANSIBLE_LIBRARY=/path/to/ansible-gluster:/usr/share/ansible
     ```
 
 3. Edit the example host files to specify the hostnames of your servers and comment/delete any unused systems.
