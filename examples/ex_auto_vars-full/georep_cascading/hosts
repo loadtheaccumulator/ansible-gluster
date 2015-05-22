@@ -1,0 +1,57 @@
+# This is an example ansible 'hosts' file
+#   for ansible-gluster and CASCADING GEOREP
+#
+# It can be used with playbooks:
+#   glustergeorep_cascading.yml
+#   ex_destroy_glustergeorep_cascading.yml
+#
+
+[MC_MASTERNODE]
+192.168.1.221
+
+[MC_PEERS]
+192.168.1.222
+
+[IC_MASTERNODE]
+192.168.1.223
+
+[IC_PEERS]
+192.168.1.224
+
+[SC_MASTERNODE]
+192.168.1.225
+
+[SC_PEERS]
+192.168.1.226
+
+[CLIENTS]
+192.168.1.227
+#192.168.1.228
+#192.168.1.229
+
+
+# NO NEED TO EDIT BELOW THIS LINE
+
+[MC_NODES:children]
+MC_MASTERNODE
+MC_PEERS
+
+[IC_NODES:children]
+IC_MASTERNODE
+IC_PEERS
+
+[SC_NODES:children]
+SC_MASTERNODE
+SC_PEERS
+
+[NODES:children]
+MC_MASTERNODE
+MC_PEERS
+IC_MASTERNODE
+IC_PEERS
+SC_MASTERNODE
+SC_PEERS
+
+[ALL:children]
+NODES
+CLIENTS

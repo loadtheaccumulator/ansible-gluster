@@ -1,0 +1,53 @@
+---
+# Jonathan Holloway <loadtheaccumulator@gmail.com>
+# VARIABLES FOR GEO_REP CASCADING EXAMPLE
+
+# EXAMPLE COMMANDS:
+#   ansible-playbook -i examples/ex_auto_vars-full/georep_cascading/hosts -vv \
+#                       examples/ex_auto_vars-full/glustergeorep_cascading.yml \
+#                       --extra-vars="varfile=georep_cascading/vars.yml"
+#
+#   ansible-playbook -i examples/ex_auto_vars-full/georep_cascading/hosts -vv \
+#                       examples/ex_auto_vars-full/ex_destroy_glustergeorep_cascading.yml \
+#                       --extra-vars="varfile=georep_cascading/vars.yml"
+#
+# OR:
+#
+#   ./do_example.sh create georep_cascading georep_cascading
+#   ./do_example.sh destroy georep_cascading georep_cascading
+#
+
+
+# BRICK VARS
+# use if you require specific devices
+#   (e.g., single disk or existing environment)
+#pvnames:
+#- /dev/replaceme1
+#- /dev/replaceme2
+
+
+# VOLUME VARS
+volume_type: distributed-replicated
+replica: 2
+smb_user: root
+smb_pass: ansmble
+
+
+# GEOREP VARS
+mc_volumename: mastergeovol
+ic_volumename: intergeovol
+sc_volumename: slavegeovol
+#mc_master_volume_name: mastergeovol
+#mc_slave_host: "{{ groups.IC_MASTERNODE.0 }}"
+#mc_slave_volume_name: intergeovol
+
+
+# CLIENT MOUNT VARS
+#
+server: "{{ groups.MC_MASTERNODE.0 }}"
+volume: "{{ mc_volumename }}"
+mountpoint: /mnt/gluster-mount
+#type: glusterfs
+#type: nfs
+type: cifs
+

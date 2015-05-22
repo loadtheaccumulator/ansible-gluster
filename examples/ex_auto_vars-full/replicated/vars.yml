@@ -1,0 +1,49 @@
+---
+# Jonathan Holloway <loadtheaccumulator@gmail.com>
+# VARIABLES FOR REPLICATED EXAMPLE
+
+# EXAMPLE COMMANDS:
+#   ansible-playbook -i examples/ex_auto_vars-full/replicated/hosts -vv \
+#                       examples/ex_auto_vars-full/glustervolume.yml \
+#                       --extra-vars="varfile=replicated/vars.yml"
+#
+#   ansible-playbook -i examples/ex_auto_vars-full/replicated/hosts -vv \
+#                       examples/ex_auto_vars-full/ex_destroy_glustervolume.yml \
+#                       --extra-vars="varfile=replicated/vars.yml"
+#
+# OR:
+#
+#   ./do_example.sh create volume replicated
+#   ./do_example.sh destroy volume replicated
+#
+
+
+# BRICK VARS
+# use if you require specific devices
+#   (e.g., single disk or existing environment)
+#pvnames:
+#- /dev/replaceme1
+#- /dev/replaceme2
+
+
+# VOLUME VARS
+#
+volume_type: replicated
+replica: 2
+use_bricks: 1
+volumename: glustervol1
+peers: "{{ groups['PEERS'] }}"
+#skip_samba: true
+smb_user: root
+smb_pass: ansmble
+
+
+# CLIENT MOUNT VARS
+#
+server: "{{ groups.MASTERNODE.0 }}"
+volume: "{{ volumename }}"
+mountpoint: /mnt/gluster-mount
+#type: glusterfs
+#type: nfs
+type: cifs
+

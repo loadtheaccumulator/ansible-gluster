@@ -1,0 +1,45 @@
+# This is an example ansible 'hosts' file
+#   for ansible-gluster and GEOREP
+#
+# It can be used with playbooks:
+#   glustergeorep.yml
+#   ex_destroy_glustergeorep.yml
+#
+
+[MC_MASTERNODE]
+192.168.1.221
+
+[MC_PEERS]
+192.168.1.222
+
+[SC_MASTERNODE]
+192.168.1.223
+
+[SC_PEERS]
+192.168.1.224
+
+[CLIENTS]
+192.168.1.227
+#192.168.1.228
+#192.168.1.229
+
+
+# NO NEED TO EDIT BELOW THIS LINE
+
+[MC_NODES:children]
+MC_MASTERNODE
+MC_PEERS
+
+[SC_NODES:children]
+SC_MASTERNODE
+SC_PEERS
+
+[NODES:children]
+MC_MASTERNODE
+MC_PEERS
+SC_MASTERNODE
+SC_PEERS
+
+[ALL:children]
+NODES
+CLIENTS

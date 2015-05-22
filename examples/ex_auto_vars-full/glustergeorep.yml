@@ -1,0 +1,381 @@
+---
+# Jonathan Holloway <loadtheaccumulator@gmail.com>
+# EXAMPLE: Setup and start geo-replication
+#           using roles and include files for vars
+#
+# ansible-playbook -i examples/ex_hosts_georep_cascading_lab -vv \
+#   examples/ex_automanual/ex_georep_cascading_lab.yml  \
+#   --extra-vars="varfile=../ex_vars_georep_cascading_lab.yml"
+
+#----------------------------------
+# SETUP DEVICES ON ALL NODES
+- hosts: NODES
+  remote_user: root
+  gather_facts: no
+
+  vars:
+    vgname_prefix: vg_gluster0
+    poolname_prefix: lv_pool0
+    lvname_prefix: lv_brick0
+    fslabel_prefix: brick0
+    mountpoint_prefix: "/bricks/fs_gluster0"
+    brickname: brick
+
+  vars_files:
+    - "{{ varfile }}"
+
+
+# REQUIRED VARIABLES
+#pvnames:
+#- /dev/sda2
+#- /dev/sda3
+#- /dev/sda5
+
+#vgname_prefix: vg_gluster
+#poolname_prefix: lv_pool
+#lvname_prefix: lv_brick
+#fslabel_prefix: brick
+#mountpoint_prefix: "/gluster"
+#brickname: brick
+
+  tasks:
+  # loop through pvnames list and create individual bricks with incremental names based on the _prefix vars above
+  - name: create bricks
+    glusterbrick: command=create_brick pvname={{ item.1 }} vgname={{ vgname_prefix }}{{ item.0 + 1 }} poolname={{ poolname_prefix }}{{ item.0 + 1 }} lvname={{ lvname_prefix }}{{ item.0 + 1 }} fslabel={{ fslabel_prefix }}{{ item.0 + 1 }} mountpoint={{ mountpoint_prefix }}{{ item.0 + 1 }} brickname={{ brickname }}
+    with_indexed_items: pvnames
+    when: pvnames is defined
+    tags:
+    - create_bricks
+
+  - name: auto create bricks
+    glusterbrick: command=autocreate
+    register: num_bricks
+    when: pvnames is not defined
+    tags:
+    - autocreate_bricks
+
+  # TUNED-ADM PROFILE
+  - name: set tuned-adm profile
+    shell: "tuned-adm profile default; tuned-adm profile {{ tuned_profile|default('rhs-high-throughput') }}"
+    when: skip_tuning is not defined
+    tags:
+    - tuned-adm_profile
+
+  # CONFIGURE SAMBA
+  - name: configure samba
+    service: name=smb enabled=yes
+    when: skip_samba is not defined
+    tags:
+    - config_samba
+
+  - name: start samba service
+    service: name=smb state=started
+    when: skip_samba is not defined
+    tags:
+    - config_samba
+
+  - name: set samba user/pass
+    shell: (echo "{{ smb_pass }}"; echo "{{ smb_pass }}" ) | smbpasswd -as {{ smb_user }}
+    when: skip_samba is not defined
+    tags:
+    - config_samba
+
+
+#----------------------------------
+# CREATE A VOLUME ON THE MASTER CLUSTER
+- hosts: MC_MASTERNODE
+  remote_user: root
+  gather_facts: no
+
+  vars_files:
+    - "{{ varfile }}"
+
+  vars:
+    volumename: "{{ mc_volumename }}"
+    peers: "{{ groups['MC_PEERS'] }}"
+    use_servers: "{{ groups.MC_NODES|join(' ') }}"
+#    bricks: "{{ mc_bricks }}"
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  peers
+    tags:
+      peers_add
+
+# TODO: let module figure out instructions based on vars passed (e.g., auto vs manual dev names)
+
+  # DISTRIBUTED w/ AUTO DISCOVER
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} num_bricks={{ use_bricks|default(num_bricks.msg) }} servers="{{ use_servers|default(default_servers) }}"
+    when: bricks is not defined and pvnames is not defined and volume_type == "distributed"
+    tags:
+      volume_autocreate
+
+
+  # REPLICATED w/ AUTO DISCOVER
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a replicated volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ use_bricks|default(num_bricks.msg) }} servers="{{ use_servers|default(default_servers) }}"
+    when: bricks is not defined and pvnames is not defined and volume_type == "replicated"
+    tags:
+      volume_autocreate
+
+
+  # DISTRIBUTED-REPLICATED w/ AUTO DISCOVER
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ use_bricks|default(num_bricks.msg) }} servers="{{ use_servers|default(default_servers) }}"
+    when: bricks is not defined and pvnames is not defined and volume_type == "distributed-replicated"
+    tags:
+      volume_autocreate
+
+
+
+  # REPLICATED w/ SPECIFIC DEVICES AND AUTO VOLUME
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a replicated volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ pvnames|length }} servers="{{ groups.NODES|join(' ') }}"
+    when: bricks is not defined and pvnames is defined and volume_type == "replicated"
+    tags:
+      volume_autocreate
+
+
+  # DISTRIBUTED w/ SPECIFIC DEVICES AND AUTO VOLUME
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} num_bricks={{ pvnames|length }} servers="{{ groups.NODES|join(' ') }}"
+    when: bricks is not defined and pvnames is defined and volume_type == "distributed"
+    tags:
+      volume_autocreate
+
+
+  # DISTRIBUTED-REPLICATED w/ SPECIFIC DEVICES AND AUTO VOLUME
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ pvnames|length }} servers="{{ groups.NODES|join(' ') }}"
+    when: bricks is not defined and pvnames is defined and volume_type == "distributed-replicated"
+    tags:
+      volume_autocreate
+
+
+
+  # DISTRIBUTED w/ SPECIFIC DEVICES
+  - name: create a distributed volume with specific devices
+    glustervolume: command=create name={{ volumename }} bricks="{{ bricks|join(' ') }}"
+    when: bricks is defined and volume_type == "distributed"
+    tags:
+      volume_create
+
+
+  # REPLICATED w/ SPECIFIC DEVICES
+  - name: create a replicated volume with specific devices
+    glustervolume: command=create name={{ volumename }} replica={{ replica }} bricks="{{ bricks|join(' ') }}"
+    when: bricks is defined and volume_type == "replicated"
+    tags:
+      volume_create
+
+
+  # DISTRIBUTED-REPLICATED w/ SPECIFIC DEVICES
+  - name: create a distributed-replicated volume with specific devices
+    glustervolume: command=create name={{ volumename }} replica={{ replica }} bricks="{{ bricks|join(' ') }}"
+    when: bricks is defined and volume_type == "distributed-replicated"
+    tags:
+      volume_create
+
+
+  # START THE VOLUME
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    tags:
+      volume_start
+
+
+
+#----------------------------------
+# CREATE A VOLUME ON THE SLAVE CLUSTER
+- hosts: SC_MASTERNODE
+  remote_user: root
+  gather_facts: no
+
+  vars_files:
+    - "{{ varfile }}"
+
+  vars:
+    volumename: "{{ sc_volumename }}"
+    peers: "{{ groups['SC_PEERS'] }}"
+    use_servers: "{{ groups.SC_NODES|join(' ') }}"
+#    bricks: "{{ sc_bricks }}"
+
+  tasks:
+  - name: add peers
+    glusterpeer: command=probe name={{ item }}
+    with_items:  peers
+    tags:
+      peers_add
+
+# TODO: let module figure out instructions based on vars passed (e.g., auto vs manual dev names)
+
+  # DISTRIBUTED w/ AUTO DISCOVER
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} num_bricks={{ use_bricks|default(num_bricks.msg) }} servers="{{ use_servers|default(default_servers) }}"
+    when: bricks is not defined and pvnames is not defined and volume_type == "distributed"
+    tags:
+      volume_autocreate
+
+
+  # REPLICATED w/ AUTO DISCOVER
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a replicated volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ use_bricks|default(num_bricks.msg) }} servers="{{ use_servers|default(default_servers) }}"
+    when: bricks is not defined and pvnames is not defined and volume_type == "replicated"
+    tags:
+      volume_autocreate
+
+
+  # DISTRIBUTED-REPLICATED w/ AUTO DISCOVER
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ use_bricks|default(num_bricks.msg) }} servers="{{ use_servers|default(default_servers) }}"
+    when: bricks is not defined and pvnames is not defined and volume_type == "distributed-replicated"
+    tags:
+      volume_autocreate
+
+
+
+  # REPLICATED w/ SPECIFIC DEVICES AND AUTO VOLUME
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a replicated volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ pvnames|length }} servers="{{ groups.NODES|join(' ') }}"
+    when: bricks is not defined and pvnames is defined and volume_type == "replicated"
+    tags:
+      volume_autocreate
+
+
+  # DISTRIBUTED w/ SPECIFIC DEVICES AND AUTO VOLUME
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} num_bricks={{ pvnames|length }} servers="{{ groups.NODES|join(' ') }}"
+    when: bricks is not defined and pvnames is defined and volume_type == "distributed"
+    tags:
+      volume_autocreate
+
+
+  # DISTRIBUTED-REPLICATED w/ SPECIFIC DEVICES AND AUTO VOLUME
+  # TODO: swap groups.NODES out for a generic variable (nodes)
+  - name: create a distributed volume with automatic device discovery
+    glustervolume: command=autocreate name={{ volumename }} replica={{ replica }} num_bricks={{ pvnames|length }} servers="{{ groups.NODES|join(' ') }}"
+    when: bricks is not defined and pvnames is defined and volume_type == "distributed-replicated"
+    tags:
+      volume_autocreate
+
+
+
+  # DISTRIBUTED w/ SPECIFIC DEVICES
+  - name: create a distributed volume with specific devices
+    glustervolume: command=create name={{ volumename }} bricks="{{ bricks|join(' ') }}"
+    when: bricks is defined and volume_type == "distributed"
+    tags:
+      volume_create
+
+
+  # REPLICATED w/ SPECIFIC DEVICES
+  - name: create a replicated volume with specific devices
+    glustervolume: command=create name={{ volumename }} replica={{ replica }} bricks="{{ bricks|join(' ') }}"
+    when: bricks is defined and volume_type == "replicated"
+    tags:
+      volume_create
+
+
+  # DISTRIBUTED-REPLICATED w/ SPECIFIC DEVICES
+  - name: create a distributed-replicated volume with specific devices
+    glustervolume: command=create name={{ volumename }} replica={{ replica }} bricks="{{ bricks|join(' ') }}"
+    when: bricks is defined and volume_type == "distributed-replicated"
+    tags:
+      volume_create
+
+
+  # START THE VOLUME
+  - name: start a volume
+    glustervolume: command=start name={{ volumename }}
+    tags:
+      volume_start
+
+
+
+#----------------------------------
+# CREATE THE GEO-REP ON THE MASTER CLUSTER
+- hosts: MC_MASTERNODE
+  remote_user: root
+  gather_facts: no
+
+  vars_files:
+    - "{{ varfile }}"
+
+  vars:
+    master_volume_name: "{{ mc_volumename }}"
+    slave_host: "{{ groups.SC_MASTERNODE.0 }}"
+    slave_volume_name: "{{ sc_volumename }}"
+
+  tasks:
+  - name: create the geo-rep
+    glustergeorep: command=create master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+
+  - name: start the geo-rep
+    glustergeorep: command=start master_volume_name={{ master_volume_name }} slave_host={{ slave_host }} slave_volume_name={{ slave_volume_name }}
+
+
+  - name: geo-rep status
+    command: gluster volume geo-replication {{ master_volume_name }} {{ slave_host }}::{{ slave_volume_name }} status
+    register: geoinfo
+    tags:
+      - status
+
+  - debug: var=geoinfo.stdout_lines
+    tags:
+      - status
+
+
+#----------------------------------
+# MOUNT THE VOLUME ON THE CLIENTS
+- hosts: CLIENTS
+  remote_user: root
+  gather_facts: no
+
+  vars_files:
+    - "{{ varfile }}"
+
+  tasks:
+  - name: install glusterfs
+    yum: name=glusterfs state=present
+  - name: install glusterfs-fuse
+    yum: name=glusterfs-fuse state=present
+
+  # MOUNT THE VOLUMES
+
+  # GLUSTERFS
+  - name: mount the volume with glusterfs
+    mount: name={{ mountpoint }} src={{ server }}:/{{ volume }} fstype={{ type }} state=mounted
+    when: type == "glusterfs"
+  #  glusterclient: command=mount server={{ server }} volume={{ volume }} mountpoint={{ mountpoint }} type={{ type }}
+    tags:
+      - client_mount
+
+  # NFS
+  - name: mount the volume with nfs
+  #command_string = "mount -t %s -o vers=3,mountproto=tcp %s:/%s %s" % (self.type, self.server, self.volume, self.mountpoint)
+    mount: fstype={{ type }} opts=vers=3,mountproto=tcp src={{ server }}:/{{ volume }} name={{ mountpoint }}  state=mounted
+    when: type == "nfs"
+    tags:
+      - client_mount
+
+  # CIFS
+  - name: mount the volume with cifs
+  #command_string = "mount -t %s -o username=%s,password=%s //%s/gluster-%s %s" % (self.type, self.username, self.password, self.server, self.volume, self.mountpoint)
+    mount: fstype={{ type }} opts=username={{ smb_user|default("") }},password={{ smb_pass|default("") }} name={{ mountpoint }} src=//{{ server }}/gluster-{{ volume }} state=mounted 
+    when: type == "cifs"
+    tags:
+      - client_mount
+
