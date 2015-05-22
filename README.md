@@ -20,17 +20,12 @@ The examples in the other directories work, but were stepping stones to get to t
 4. To use the example playbooks (as is), you will need the number of systems (VM or baremetal) per the list below...
 
 Each volume type below will require at least one additional system for the client mount.
-    - replicated volume requires                        2 systems
-    - distributed or distributed-replicated volume      4 systems
-    - geo-rep volume requires                           4 systems
-    - geo-rep cascading requires                        6 systems
+- replicated volume requires                        2 systems
+- distributed or distributed-replicated volume      4 systems
+- geo-rep volume requires                           4 systems
+- geo-rep cascading requires                        6 systems
 
-NOTE: If you setup seven systems (VM or BM) with IPs numbered 192.168.1.221 through 192.168.1.227,
-      you will be able to use the playbooks without modifying the hostfiles.
-
-      In my lab setup, I created nine VMs running Red Hat Gluster Storage 3.0.
-
-      Systems #8 and #9 allowed me to play with simultaneously mounting volumes on multiple clients (optional).
+NOTE: If you setup seven systems (VM or BM) with IPs numbered 192.168.1.221 through 192.168.1.227, you will be able to use the playbooks without modifying the hostfiles. In my lab setup, I created nine VMs running Red Hat Gluster Storage 3.0. Systems #8 and #9 allowed me to play with simultaneously mounting volumes on multiple clients (optional).
 
 
 ### Setting up:
