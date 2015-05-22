@@ -61,6 +61,8 @@
     mountpoint_prefix: "/bricks/fs_gluster"
     brickname: brick
 
+
+# DESTROY THE BRICKS
   tasks:
   - name: auto destroy bricks
     glusterbrick: command=autodestroy

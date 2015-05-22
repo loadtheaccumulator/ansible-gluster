@@ -132,7 +132,6 @@
     ignore_errors: yes
 
 
-# DESTROY THE BRICKS
 - hosts: NODES
   gather_facts: no
   remote_user: root
@@ -148,6 +147,8 @@
     mountpoint_prefix: "/bricks/fs_gluster"
     brickname: brick
 
+
+# DESTROY THE BRICKS
   tasks:
   - name: auto destroy bricks
     glusterbrick: command=autodestroy vgname={{ vgname_prefix }} poolname={{ poolname_prefix }} lvname={{ lvname_prefix }} fslabel={{ fslabel_prefix }} mountpoint={{ mountpoint_prefix }} brickname={{ brickname }}
@@ -157,15 +158,46 @@
       autodestroy_bricks
 
 
-# REMOVE THE PEM FILES
-- hosts: NODES
-  gather_facts: no
-  remote_user: root
+  # TUNED-ADM PROFILE
+  - name: set tuned-adm profile
+    shell: "tuned-adm profile default"
+    when: skip_tuning is not defined
+    ignore_errors: yes
+    tags:
+    - tuned-adm_profile_default
 
-  tasks:
+
+  # CONFIGURE SAMBA
+  # TODO: ansiblefy these
+  - name: chkconfig off samba
+    service: name=smb enabled=no
+    when: skip_samba is not defined
+    ignore_errors: yes
+    tags:
+    - deconfig_samba
+
+  - name: stop samba service
+    service: name=smb state=stopped
+    ignore_errors: yes
+    when: skip_samba is not defined
+    tags:
+    - deconfig_samba
+
+# TODO: add some logic to scramble root passwd or remove non-root user
+  - name: deconfig samba user/pass
+    shell: (echo "lkjsldedljsldj"; echo "lkjsldedljsldj" ) | smbpasswd -as {{ smb_user }}
+    ignore_errors: yes
+    when: skip_samba is not defined
+    tags:
+    - deconfig_samba
+
+
+# REMOVE THE PEM FILES
   - name: remove pem files
+#    file: path=/var/lib/glusterd/geo-replication/*pem* state=absent
     shell: 'rm -f /var/lib/glusterd/geo-replication/*pem*'
     ignore_errors: yes
     tags:
       remove_pemfiles
+
 
